@@ -153,7 +153,6 @@ static void ecr_server_master_connection_cb(uv_stream_t *stream, int status) {
     uv_tcp_t *client = (uv_tcp_t*) malloc(sizeof(uv_tcp_t));
     uv_tcp_init(stream->loop, client);
     if (uv_accept(stream, (uv_stream_t*) client) == 0) {
-        L_INFO("connection accepted at %p", client);
         uv_stream_set_blocking((uv_stream_t*) client, 0);
         uv_write_t *write = malloc(sizeof(uv_write_t));
         uv_write2(write, (uv_stream_t*) worker_pipe, &buf, 1, (uv_stream_t*) client, ecr_server_pipe_write_cb);
@@ -172,7 +171,6 @@ static void ecr_server_master_pipe_connection_cb(uv_stream_t *stream, int status
     uv_pipe_init(stream->loop, client, 1);
     if (uv_accept(stream, (uv_stream_t*) client) == 0) {
         uv_stream_set_blocking((uv_stream_t*) client, 0);
-        L_INFO("pipe connected at %p", client);
         ecr_list_add(&worker->server->worker_pipes, client);
     } else {
         uv_close((uv_handle_t*) client, ecr_server_close_cb);
@@ -188,15 +186,12 @@ static void ecr_server_worker_pipe_read_cb(uv_stream_t *stream, ssize_t nread, c
         return;
     }
     ecr_server_worker_t *worker = stream->data;
-    L_INFO("got piped connection 0");
     uv_pipe_t *pipe = (uv_pipe_t*) stream;
     if (uv_pipe_pending_count(pipe)) {
-        L_INFO("got piped connection 1");
         uv_tcp_t *client = malloc(sizeof(uv_tcp_t));
         client->data = worker;
         uv_tcp_init(pipe->loop, client);
         if (uv_accept(stream, (uv_stream_t*) client) == 0) {
-            L_INFO("piped connection accepted: %p", client);
             uv_stream_set_blocking((uv_stream_t*) client, 0);
             worker->server->config.accept_cb(worker, client);
         } else {
@@ -216,7 +211,6 @@ static void ecr_server_worker_pipe_connect_cb(uv_connect_t *req, int status) {
     if (status) {
         L_ERROR("pipe connect error: %s[%d]", uv_strerror(status), status);
     } else {
-        L_INFO("pipe connected.");
         uv_read_start(req->handle, ecr_server_alloc_cb, ecr_server_worker_pipe_read_cb);
     }
 }
