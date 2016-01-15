@@ -28,6 +28,7 @@ nobase_include_HEADERS = ecr.h ecrconf.h \
 	ecr/ecr_mempool.h \
 	ecr/ecr_pcap.h \
 	ecr/ecr_pkware.h \
+	ecr/ecr_pub.h \
 	ecr/ecr_radius.h \
 	ecr/ecr_rollingfile.h \
 	ecr/ecr_server.h \
@@ -59,6 +60,7 @@ libecr_la_SOURCES = \
 	ecr/ecr_mempool.c \
 	ecr/ecr_pcap.c \
 	ecr/ecr_pkware.c \
+	ecr/ecr_pub.c \
 	ecr/ecr_radius.c \
 	ecr/ecr_rollingfile.c \
 	ecr/ecr_server.c \

@@ -228,12 +228,12 @@ int ecr_get_thread_name(char *name);
 
 int ecr_wildcard_match(char *src, char *pattern, int ignore_case);
 
-char *ecr_base64_encode(const char *cptr, size_t len);
+size_t ecr_base64_encode(const char *cptr, size_t len);
 
 /**
  * to must at least (len / 3 + 6 + len) bytes long
  */
-char *ecr_base64_encode_s(char *to, const char *cptr, size_t len);
+size_t ecr_base64_encode_s(char *to, const char *cptr, size_t len);
 
 char *ecr_mem_replace_char(char *str, size_t len, const char *finds, char replacement);
 
