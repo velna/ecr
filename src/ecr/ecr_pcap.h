@@ -114,8 +114,7 @@ struct ecr_pcap_s {
     int batch_size;
     ecr_pcap_stat_t stat;
     ecr_pcap_cfg_t config;
-    pthread_mutex_t close_mutex;
-    pthread_cond_t close_confirm;
+    volatile AO_t close_confirm;
     int active :1;
     int closed :1;
     union {

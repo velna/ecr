@@ -1154,15 +1154,8 @@ int ecr_bwl_matches_fixed(ecr_bwl_t *list, ecr_fixedhash_t *hash, ecr_bwl_result
 
     data = list->data;
 
-    if (result->sources.len != list->next_sid) {
-        result->sources.len = list->next_sid;
-        free(result->sources.ptr);
-        result->sources.ptr = calloc(1, result->sources.len);
-    }
-    if (result->exprs.len != data->next_expr_id) {
-        result->exprs.len = data->next_expr_id;
-        free(result->exprs.ptr);
-        result->exprs.ptr = calloc(1, result->exprs.len);
+    if (result->sources.len < list->next_sid || result->exprs.len < data->next_expr_id) {
+        return -1;
     }
 
     group = data->groups;

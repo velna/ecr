@@ -212,7 +212,15 @@ void test_inet_ntop() {
     printf("%lu\n", ecr_current_time() - now);
 }
 
+void base64_test() {
+    char buf[4096] = { 0 }, str[20];
+    memset(str, 0xff, sizeof(str));
+    size_t n = ecr_base64_encode_s(buf, str, 20);
+    ecr_binary_dump(stdout, buf, n);
+    printf("%zd, [%s]\n", n, buf);
+}
+
 int main(int argc, char **argv) {
-    test_inet_ntop();
+    base64_test();
     return EXIT_SUCCESS;
 }

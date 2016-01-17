@@ -277,8 +277,9 @@ int ecr_wildcard_match(char *src, char *pattern, int ignore_case) {
 
 static const char * BASE64_TABLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
 
-size_t ecr_base64_encode_s(char *to, const char *cptr, size_t len) {
+size_t ecr_base64_encode_s(char *to, const void *str, size_t len) {
     char *res;
+    const unsigned char *cptr = str;
     int i, clen;
     clen = len / 3;
 
@@ -311,13 +312,6 @@ size_t ecr_base64_encode_s(char *to, const char *cptr, size_t len) {
     *res = '\0';
 
     return res - to;
-}
-
-size_t ecr_base64_encode(const char *cptr, size_t len) {
-    char *ret;
-    if (cptr == NULL || (ret = malloc(len / 3 + 3 * 2 + len)) == NULL)
-        return 0;
-    return ecr_base64_encode_s(ret, cptr, len);
 }
 
 char *ecr_mem_replace_char(char *str, size_t len, const char *finds, char replacement) {

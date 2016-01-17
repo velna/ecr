@@ -35,9 +35,7 @@ static void * ecr_pcap_routine(void *user) {
                     ok += capable->cap_func(capable->pcap, tid, capable->pcap->config.user, capable->user);
                 }
                 if (capable->pcap->closed) {
-                    pthread_mutex_lock(&capable->pcap->close_mutex);
-                    pthread_cond_signal(&capable->pcap->close_confirm);
-                    pthread_mutex_unlock(&capable->pcap->close_mutex);
+                    AO_fetch_and_add1(&capable->pcap->close_confirm);
                     linked_list_drop(capable_chain, capable);
                     free(capable);
                 }
@@ -338,8 +336,6 @@ ecr_pcap_t * ecr_pcap_pool_add(ecr_pcap_pool_t *pool, const char *device, const 
         pcap->device = strdup(device);
         pcap->pool = pool;
         pcap->config = *cfg;
-        pthread_mutex_init(&pcap->close_mutex, NULL);
-        pthread_cond_init(&pcap->close_confirm, NULL);
 
         ecr_list_add(&pool->pcaps, pcap);
     } else {
@@ -395,20 +391,16 @@ int ecr_pcap_stats(ecr_pcap_t *pcap, ecr_pcap_stat_t *stat) {
 }
 
 int ecr_pcap_close(ecr_pcap_t *pcap) {
-    int i, j, n;
+    int i, j;
 
     if (!pcap) {
         return -1;
     }
     ecr_list_remove(&pcap->pool->pcaps, pcap);
     pcap->closed = 1;
-    n = 0;
-    pthread_mutex_lock(&pcap->close_mutex);
-    while (n < pcap->pool->num_threads) {
-        pthread_cond_wait(&pcap->close_confirm, &pcap->close_mutex);
-        n++;
+    while (pcap->close_confirm < pcap->pool->num_threads) {
+        ;
     }
-    pthread_mutex_unlock(&pcap->close_mutex);
 
     switch (pcap->config.family) {
     case ECR_PCAP_FAMILY_LIBPCAP:
@@ -438,8 +430,6 @@ int ecr_pcap_close(ecr_pcap_t *pcap) {
 #endif
     }
     free_to_null(pcap->device);
-    pthread_mutex_destroy(&pcap->close_mutex);
-    pthread_cond_destroy(&pcap->close_confirm);
     free(pcap);
     return 0;
 }
