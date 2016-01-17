@@ -220,7 +220,11 @@ void base64_test() {
     printf("%zd, [%s]\n", n, buf);
 }
 
+void ecr_version_test() {
+    printf("%s\n", ecr_commit_sha());
+}
+
 int main(int argc, char **argv) {
-    base64_test();
+    ecr_version_test();
     return EXIT_SUCCESS;
 }

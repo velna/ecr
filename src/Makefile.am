@@ -40,6 +40,7 @@ nobase_include_HEADERS = ecr.h ecrconf.h \
 
 # Sources for ecr
 libecr_la_SOURCES = \
+	ecr_version.c \
 	ecr/ecr_app.c \
 	ecr/ecr_bloomfilter.c \
 	ecr/ecr_buf.c \

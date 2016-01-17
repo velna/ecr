@@ -29,4 +29,6 @@ typedef int (*ecr_compare_func)(const void *a, const void *b);
 
 #define ECR_INLINE __attribute__((always_inline))
 
+const char * ecr_commit_sha();
+
 #endif /* SRC_ECRCONF_H_ */
