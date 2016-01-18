@@ -142,8 +142,8 @@ int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *config) {
                 }
             }
         }
-        output->total = ecr_counter_create(pub->config.cctx, pub->id, "file.ok", 0);
-        output->total_bytes = ecr_counter_create(pub->config.cctx, pub->id, "file.bytes", 0);
+        output->total = ecr_counter_create(pub->config.cctx, pub->id, "file_ok", 0);
+        output->total_bytes = ecr_counter_create(pub->config.cctx, pub->id, "file_bytes", 0);
         L_INFO("%s: add file output: %s[%d].", pub->id, config->file.name, config->file.split);
         break;
     case ECR_PUB_KAFKA:
