@@ -254,7 +254,6 @@ void ecr_pub(ecr_pub_t *pub, void *data, int tid) {
             default:
                 break;
             }
-            ecr_counter_incr(output->total);
             ecr_counter_add(output->total_bytes, buf->len);
         }
         output = output->next;
