@@ -86,8 +86,6 @@ int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *config) {
     int i, j;
     char *fp, *s, errstr[512];
     FILE *file;
-    rd_kafka_conf_t *conf;
-    rd_kafka_topic_conf_t *topic_conf;
 
     switch (config->type) {
     case ECR_PUB_STAT:
@@ -151,9 +149,8 @@ int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *config) {
     case ECR_PUB_KAFKA:
         if (config->kafka.brokers) {
             output->kafka.new = 1;
-            conf = rd_kafka_conf_new();
-            output->kafka.kafka = rd_kafka_new(RD_KAFKA_PRODUCER, conf, errstr, sizeof(errstr));
-            rd_kafka_conf_destroy(conf);
+            output->kafka.conf = rd_kafka_conf_new();
+            output->kafka.kafka = rd_kafka_new(RD_KAFKA_PRODUCER, output->kafka.conf, errstr, sizeof(errstr));
             if (!output->kafka.kafka) {
                 L_ERROR("%s: error init kafka file %s@%s, %s", pub->id, config->kafka.topic, config->kafka.brokers,
                         errstr);
@@ -179,9 +176,8 @@ int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *config) {
             }
         }
 
-        topic_conf = rd_kafka_topic_conf_new();
-        output->kafka.topic = rd_kafka_topic_new(output->kafka.kafka, config->kafka.topic, topic_conf);
-        rd_kafka_topic_conf_destroy(topic_conf);
+        output->kafka.topic_conf = rd_kafka_topic_conf_new();
+        output->kafka.topic = rd_kafka_topic_new(output->kafka.kafka, config->kafka.topic, output->kafka.topic_conf);
         if (!output->kafka.topic) {
             L_ERROR("%s: error init kafka file %s@%s, Failed to create new topic: %s", pub->id, config->kafka.topic,
                     config->kafka.brokers, rd_kafka_err2str(rd_kafka_errno2err(errno)));
@@ -297,8 +293,10 @@ void ecr_pub_destroy(ecr_pub_t *pub) {
         case ECR_PUB_KAFKA:
             rd_kafka_poll(output->kafka.kafka, 0);
             rd_kafka_topic_destroy(output->kafka.topic);
+            rd_kafka_topic_conf_destroy(output->kafka.topic_conf);
             if (output->kafka.new) {
                 rd_kafka_destroy(output->kafka.kafka);
+                rd_kafka_conf_destroy(output->kafka.conf);
                 rd_kafka_wait_destroyed(1000);
             }
             break;
