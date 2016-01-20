@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-void ecr_skiplist_free_value_handler(ecr_skiplist_t *sl, void *value) {
+void ecr_skiplist_free_value_handler(ecr_skiplist_t *sl, void *value, void *user) {
     free(value);
 }
 
@@ -43,14 +43,14 @@ size_t ecr_skiplist_size(ecr_skiplist_t *sl) {
     return sl->size;
 }
 
-void ecr_skiplist_clear(ecr_skiplist_t *sl, ecr_skiplist_handler_t handler) {
+void ecr_skiplist_clear(ecr_skiplist_t *sl, ecr_skiplist_handler_t handler, void *user) {
     ecr_skiplist_node_t *node = sl->header->level[0].forward, *next;
     int j;
 
     while (node) {
         next = node->level[0].forward;
         if (handler) {
-            handler(sl, node->value);
+            handler(sl, node->value, user);
         }
         ecr_skiplist_free_node(node);
         node = next;
@@ -65,8 +65,8 @@ void ecr_skiplist_clear(ecr_skiplist_t *sl, ecr_skiplist_handler_t handler) {
     sl->tail = NULL;
 }
 
-void ecr_skiplist_destroy(ecr_skiplist_t *sl, ecr_skiplist_handler_t handler) {
-    ecr_skiplist_clear(sl, handler);
+void ecr_skiplist_destroy(ecr_skiplist_t *sl, ecr_skiplist_handler_t handler, void *user) {
+    ecr_skiplist_clear(sl, handler, user);
     free(sl->header);
 }
 

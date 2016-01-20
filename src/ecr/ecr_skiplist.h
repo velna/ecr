@@ -34,13 +34,13 @@ typedef struct {
     ecr_skiplist_node_t *next;
 } ecr_skiplist_iter_t;
 
-typedef void (*ecr_skiplist_handler_t)(ecr_skiplist_t *, void *value);
+typedef void (*ecr_skiplist_handler_t)(ecr_skiplist_t *, void *value, void *user);
 
 int ecr_skiplist_init(ecr_skiplist_t *sl, ecr_compare_func compare);
 
-void ecr_skiplist_clear(ecr_skiplist_t *sl, ecr_skiplist_handler_t handler);
+void ecr_skiplist_clear(ecr_skiplist_t *sl, ecr_skiplist_handler_t handler, void *user);
 
-void ecr_skiplist_destroy(ecr_skiplist_t *sl, ecr_skiplist_handler_t handler);
+void ecr_skiplist_destroy(ecr_skiplist_t *sl, ecr_skiplist_handler_t handler, void *user);
 
 size_t ecr_skiplist_size(ecr_skiplist_t *sl);
 
@@ -60,7 +60,7 @@ void * ecr_skiplist_find_lte(ecr_skiplist_t *sl, void *value);
 
 void * ecr_skiplist_find_gte(ecr_skiplist_t *sl, void *value);
 
-void ecr_skiplist_free_value_handler(ecr_skiplist_t *, void *value);
+void ecr_skiplist_free_value_handler(ecr_skiplist_t *, void *value, void *user);
 
 void ecr_skiplist_iter_init(ecr_skiplist_iter_t *iter, ecr_skiplist_t *sl);
 
