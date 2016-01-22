@@ -292,10 +292,8 @@ void ecr_pub_destroy(ecr_pub_t *pub) {
         case ECR_PUB_KAFKA:
             rd_kafka_poll(output->kafka.kafka, 0);
             rd_kafka_topic_destroy(output->kafka.topic);
-            rd_kafka_topic_conf_destroy(output->kafka.topic_conf);
             if (output->kafka.new) {
                 rd_kafka_destroy(output->kafka.kafka);
-                rd_kafka_conf_destroy(output->kafka.conf);
                 rd_kafka_wait_destroyed(1000);
             }
             break;
