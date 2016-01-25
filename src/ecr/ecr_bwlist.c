@@ -45,6 +45,7 @@ static int ecr_bwl_add_item(ecr_bwl_data_t *data, ecr_bwl_type_t type, const cha
     ecr_bwl_group_t *group;
     ecr_list_t *expr_ids = NULL;
     regex_t * reg;
+    int rc = 0;
 
     char *name = strdup(nm);
 
@@ -106,6 +107,7 @@ static int ecr_bwl_add_item(ecr_bwl_data_t *data, ecr_bwl_type_t type, const cha
             }
         } else {
             free(reg);
+            rc = -1;
             L_ERROR("can not compile regex [%s] in group %s", value, (char * ) group->name.ptr);
         }
         break;
@@ -114,7 +116,7 @@ static int ecr_bwl_add_item(ecr_bwl_data_t *data, ecr_bwl_type_t type, const cha
         ecr_list_add(expr_ids, user);
     }
     free(name);
-    return 0;
+    return rc;
 }
 
 static const char *ecr_bwl_type_to_string(ecr_bwl_type_t type) {
@@ -807,7 +809,7 @@ static int ecr_bwl_load_mongo(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, 
         goto l_end;
     }
     l_end: {
-        if (rc != -1) {
+        if (rc >= 0) {
             if (ecr_bwl_source_data_add(source_data, data)) {
                 ecr_bwl_source_data_destroy(source_data);
                 rc = -1;
