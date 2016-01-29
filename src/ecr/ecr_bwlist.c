@@ -678,7 +678,7 @@ static int ecr_bwl_load_mongo(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, 
     const char *field, *match_type, *tag;
     int rc = 0, idx;
     char *db_name, *collection_name;
-    int64_t count = 0, m_date = 0;
+    int64_t count = 0, m_date = 0, n;
     bson_error_t err;
     bson_t query, bson, items;
     const bson_t *doc;
@@ -716,15 +716,15 @@ static int ecr_bwl_load_mongo(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, 
         bson_append_date_time(&bson, "$gt", -1, bwsource->status.mongo.m_date);
         bson_init(&query);
         bson_append_document(&query, "m_date", -1, &bson);
-        count = mongoc_collection_count(collection, MONGOC_QUERY_SLAVE_OK, &query, 0, 1, NULL, &err);
+        n = mongoc_collection_count(collection, MONGOC_QUERY_SLAVE_OK, &query, 0, 1, NULL, &err);
         bson_destroy(&query);
         bson_destroy(&bson);
-        if (count == -1) {
+        if (n == -1) {
             L_ERROR("mongo connection error: %s[%d]", err.message, err.code);
             rc = -1;
             goto l_end;
         }
-        if (!force && count == 0) {
+        if (!force && n == 0) {
             rc = -2;
             goto l_end;
         }

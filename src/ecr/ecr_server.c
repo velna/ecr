@@ -138,6 +138,7 @@ static void ecr_server_pipe_write_cb(uv_write_t* req, int status) {
     if (status) {
         L_ERROR("pipe write error: %s[%d]", uv_strerror(status), status);
     }
+    uv_close((uv_handle_t*) req->data, ecr_server_close_cb);
     free(req);
 }
 
@@ -155,6 +156,7 @@ static void ecr_server_master_connection_cb(uv_stream_t *stream, int status) {
     if (uv_accept(stream, (uv_stream_t*) client) == 0) {
         uv_stream_set_blocking((uv_stream_t*) client, 0);
         uv_write_t *write = malloc(sizeof(uv_write_t));
+        write->data = client;
         uv_write2(write, (uv_stream_t*) worker_pipe, &buf, 1, (uv_stream_t*) client, ecr_server_pipe_write_cb);
         worker_id = (worker_id + 1) % server->config.num_workers;
     } else {

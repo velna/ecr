@@ -196,19 +196,21 @@ int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *config) {
     output->type = config->type;
     output->codec = ECR_PUB_CODEC_NONE;
     if (config->format) {
-        size_t off = strspn(config->format, "abcdefghijklmnopqrstuvwxyz0123456789");
-        if (off && config->format[off] == ':') {
-            char *codec_name = strndup(config->format, off);
-            i = 0;
-            while (pub->config.codecs[i].name) {
-                if (strcmp(codec_name, pub->config.codecs[i].name) == 0) {
-                    output->codec = pub->config.codecs[i].codec;
-                    output->format = strdup(config->format + off + 1);
-                    break;
+        if (pub->config.codecs) {
+            size_t off = strspn(config->format, "abcdefghijklmnopqrstuvwxyz0123456789");
+            if (off && config->format[off] == ':') {
+                char *codec_name = strndup(config->format, off);
+                i = 0;
+                while (pub->config.codecs[i].name) {
+                    if (strcmp(codec_name, pub->config.codecs[i].name) == 0) {
+                        output->codec = pub->config.codecs[i].codec;
+                        output->format = strdup(config->format + off + 1);
+                        break;
+                    }
+                    i++;
                 }
-                i++;
+                free(codec_name);
             }
-            free(codec_name);
         }
         if (!output->format) {
             output->format = strdup(config->format);
