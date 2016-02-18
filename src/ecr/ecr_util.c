@@ -275,45 +275,6 @@ int ecr_wildcard_match(char *src, char *pattern, int ignore_case) {
         return 1;
 }
 
-static const char * BASE64_TABLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
-
-size_t ecr_base64_encode_s(char *to, const void *str, size_t len) {
-    char *res;
-    const unsigned char *cptr = str;
-    int i, clen;
-    clen = len / 3;
-
-    for (res = to; clen--;) {
-        *res++ = BASE64_TABLE[*cptr >> 2 & 0x3f]; /*取ptr高6位放入res低6位*/
-        *res = *cptr++ << 4 & 0x30; /*移动ptr最低2位到高6位然后清0其 它位*/
-        *res = BASE64_TABLE[(*cptr >> 4) | *res]; /*取ptr高4位给res低4位*/
-        res++;
-        *res = (*cptr++ & 0x0f) << 2; /*取ptr低4位移动到高6位*/
-        *res = BASE64_TABLE[(*cptr >> 6) | *res]; /*取ptr高2位给res低2位*/
-        res++;
-        *res++ = BASE64_TABLE[*cptr++ & 0x3f];
-    }
-
-    if ((i = len % 3)) { /*处理多余字符只有两种情况多一个或者两个字符*/
-        if (i == 1) { /*根据base64编码补=号*/
-            *res++ = BASE64_TABLE[*cptr >> 2 & 0x3f];
-            *res++ = BASE64_TABLE[*cptr << 4 & 0x30];
-            *res++ = '=';
-            *res++ = '=';
-        } else {
-            *res++ = BASE64_TABLE[*cptr >> 2 & 0x3f];
-            *res = *cptr++ << 4 & 0x30;
-            *res = BASE64_TABLE[(*cptr >> 4) | *res];
-            res++;
-            *res++ = BASE64_TABLE[(*cptr & 0x0f) << 2];
-            *res++ = '=';
-        }
-    }
-    *res = '\0';
-
-    return res - to;
-}
-
 char *ecr_mem_replace_char(char *str, size_t len, const char *finds, char replacement) {
     const char *f = finds;
     size_t i = 0;

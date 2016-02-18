@@ -36,7 +36,7 @@ typedef struct {
     ecr_hashmap_t pmap;
 } ecr_wm_t;
 
-typedef int (*ecr_wm_match_handler)(ecr_wm_t *wm, const char *str, size_t len, ecr_list_t *matched_users, void *user);
+typedef int (*ecr_wm_match_handler)(ecr_wm_t *wm, const char *str, size_t len, ecr_wm_pattern_t *pattern, void *user);
 
 int ecr_wm_init(ecr_wm_t *wm, size_t init_size);
 

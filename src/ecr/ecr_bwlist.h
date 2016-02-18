@@ -39,6 +39,10 @@ typedef enum {
     BWL_NONE = 0, BWL_AND, BWL_OR, BWL_NOT
 } ecr_bwl_logic_t;
 
+typedef struct ecr_bwl_s ecr_bwl_t;
+
+typedef void (*ecr_bwl_log_handler)(ecr_bwl_t *list, int level, const char *message);
+
 typedef struct {
     int expr_id;
     char *tag;
@@ -61,6 +65,7 @@ typedef struct {
     const char *basepath;
     ecr_fixedhash_ctx_t *fixedhash_ctx;
     const char *cfile_pwd;
+    ecr_bwl_log_handler log_handler;
 } ecr_bwl_opt_t;
 
 typedef struct ecr_bwl_group_s {
@@ -102,8 +107,6 @@ typedef struct ecr_bwl_source_data_s {
     struct ecr_bwl_source_data_s *next;
 } ecr_bwl_source_data_t;
 
-typedef struct ecr_bwl_s ecr_bwl_t;
-
 typedef struct {
     ecr_bwl_t *bwl;
     ecr_bwl_group_t *groups;
@@ -126,6 +129,7 @@ typedef struct {
     size_t users_size;
     ecr_str_t sources;
     ecr_str_t exprs;
+    ecr_str_t **expr_items;
 } ecr_bwl_result_t;
 
 int ecr_bwl_init(ecr_bwl_t *list, ecr_bwl_opt_t *opt);
@@ -143,13 +147,15 @@ int ecr_bwl_reload(ecr_bwl_t *list);
 
 int ecr_bwl_check(ecr_bwl_t *list);
 
-#define ecr_bwl_result_memsize(list) (sizeof(ecr_bwl_result_t) + (list)->data->next_expr_id + (list)->next_sid + (list)->next_sid * sizeof(void*))
+#define ecr_bwl_result_memsize(list) (sizeof(ecr_bwl_result_t) + ((list)->data->next_expr_id + (list)->next_sid) * (1 + sizeof(void*)))
 
 ecr_bwl_result_t * ecr_bwl_result_init_mem(ecr_bwl_t *list, void *mem);
 
 ecr_bwl_result_t * ecr_bwl_result_init(ecr_bwl_t *list);
 
 #define ecr_bwl_contains(result, id) ((result)->sources.ptr[id])
+
+void ecr_bwl_result_clear(ecr_bwl_result_t *result);
 
 void ecr_bwl_result_destroy(ecr_bwl_result_t *result);
 

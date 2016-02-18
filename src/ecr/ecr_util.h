@@ -233,6 +233,8 @@ int ecr_wildcard_match(char *src, char *pattern, int ignore_case);
  */
 size_t ecr_base64_encode_s(char *to, const void *cptr, size_t len);
 
+int ecr_base64_decode(const unsigned char *in, size_t inlen, unsigned char *out, size_t *outlen);
+
 char *ecr_mem_replace_char(char *str, size_t len, const char *finds, char replacement);
 
 void * ecr_zmq_init(const char *endpoint, const char *options, void *zmq_ctx);

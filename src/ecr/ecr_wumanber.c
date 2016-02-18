@@ -229,10 +229,10 @@ int ecr_wm_compile(ecr_wm_t * wm) {
     return 0;
 }
 
-static int ecr_wm_default_match_handler(ecr_wm_t *wm, const char *str, size_t len, ecr_list_t *matched_users,
+static int ecr_wm_default_match_handler(ecr_wm_t *wm, const char *str, size_t len, ecr_wm_pattern_t *pattern,
         void *user) {
     ecr_list_t *result = user;
-    ecr_list_add_all(result, matched_users);
+    ecr_list_add_all(result, &pattern->users);
     return 0;
 }
 
@@ -313,7 +313,7 @@ int ecr_wm_match_ex(ecr_wm_t *wm, const char *str, size_t len, ecr_wm_match_hand
                 //L_INFO("match");
                 if (handler) {
                     c++;
-                    if (handler(wm, str, len, &pattern->users, user)) {
+                    if (handler(wm, str, len, pattern, user)) {
                         return c;
                     }
                 } else {

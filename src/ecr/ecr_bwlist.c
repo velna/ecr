@@ -18,6 +18,20 @@
 #include <ctype.h>
 #include <regex.h>
 
+typedef struct {
+    regex_t regex;
+    ecr_str_t pattern;
+} ecr_bwl_regex_t;
+
+#define ecr_bwl_log(list, level, fmt, ...) \
+    if(list->opts.log_handler) { \
+        char buf[4096]; \
+        snprintf(buf, 4096, fmt, ##__VA_ARGS__); \
+        list->opts.log_handler(list, level, buf); \
+    } else { \
+        L_LOG(level, fmt, ##__VA_ARGS__); \
+    }
+
 static void ecr_bwl_free_group_item_handler(ecr_hashmap_t *map, void *key, size_t key_size, void *value) {
     ecr_list_destroy((ecr_list_t*) value, ecr_list_free_value_handler);
 }
@@ -27,8 +41,10 @@ static void ecr_bwl_free_users_handler(ecr_hashmap_t *in, void *key, size_t key_
 }
 
 static void ecr_bwl_free_regex_users_handler(ecr_hashmap_t *in, void * key, size_t key_size, void * value) {
-    regfree((regex_t*) key);
-    free(key);
+    ecr_bwl_regex_t *regex = key;
+    regfree(&regex->regex);
+    free(regex->pattern.ptr);
+    free(regex);
     ecr_list_destroy((ecr_list_t*) value, NULL);
 }
 
@@ -44,8 +60,9 @@ static void ecr_bwl_free_user_handler(ecr_hashmap_t *map, void *key, size_t key_
 static int ecr_bwl_add_item(ecr_bwl_data_t *data, ecr_bwl_type_t type, const char *nm, const char *value, void *user) {
     ecr_bwl_group_t *group;
     ecr_list_t *expr_ids = NULL;
-    regex_t * reg;
+    ecr_bwl_regex_t *reg;
     int rc = 0;
+    size_t len;
 
     char *name = strdup(nm);
 
@@ -96,19 +113,22 @@ static int ecr_bwl_add_item(ecr_bwl_data_t *data, ecr_bwl_type_t type, const cha
         expr_ids = &group->items.exists;
         break;
     case BWL_REGEX:
-        reg = calloc(1, sizeof(regex_t));
-        if (regcomp(reg, value, REG_EXTENDED | REG_NOSUB) == 0) {
-            if ((expr_ids = ecr_hashmap_get(&group->items.regex, (const void *) reg, sizeof(regex_t))) == NULL) {
+        reg = calloc(1, sizeof(ecr_bwl_regex_t));
+        if (regcomp(&reg->regex, value, REG_EXTENDED | REG_NOSUB) == 0) {
+            len = strlen(value);
+            if ((expr_ids = ecr_hashmap_get(&group->items.regex, value, len)) == NULL) {
                 expr_ids = ecr_list_new(1);
-                ecr_hashmap_put(&group->items.regex, (const void *) reg, sizeof(regex_t), expr_ids);
+                ecr_hashmap_put(&group->items.regex, value, len, expr_ids);
+                reg->pattern.ptr = strdup(value);
+                reg->pattern.len = len;
             } else {
-                regfree(reg);
+                regfree(&reg->regex);
                 free(reg);
             }
         } else {
             free(reg);
             rc = -1;
-            L_ERROR("can not compile regex [%s] in group %s", value, (char * ) group->name.ptr);
+            ecr_bwl_log(data->bwl, LOG_ERR, "can not compile regex [%s] in group %s", value, (char * ) group->name.ptr);
         }
         break;
     }
@@ -134,7 +154,7 @@ static const char *ecr_bwl_type_to_string(ecr_bwl_type_t type) {
     }
 }
 
-static int ecr_bwl_type_parse(const char *str, ecr_bwl_type_t *bwtype) {
+static int ecr_bwl_type_parse(ecr_bwl_t *list, const char *str, ecr_bwl_type_t *bwtype) {
     ecr_bwl_type_t type;
     if (strcasecmp(str, ECR_BWL_NAME_EQUALS) == 0) {
         type = BWL_EQUALS;
@@ -145,7 +165,7 @@ static int ecr_bwl_type_parse(const char *str, ecr_bwl_type_t *bwtype) {
     } else if (strcasecmp(str, ECR_BWL_NAME_REGEX) == 0) {
         type = BWL_REGEX;
     } else {
-        L_ERROR("invalid match type: '%s'", str);
+        ecr_bwl_log(list, LOG_ERR, "invalid match type: '%s'", str);
         return -1;
     }
     if (bwtype) {
@@ -154,12 +174,12 @@ static int ecr_bwl_type_parse(const char *str, ecr_bwl_type_t *bwtype) {
     return 0;
 }
 
-static int ecr_bwl_make_expr(ecr_bwl_source_data_t *source_data, const char *name, const char *match_type,
-        ecr_bwl_type_t *bwtype, ecr_list_t **group_items_out) {
+static int ecr_bwl_make_expr(ecr_bwl_data_t *data, ecr_bwl_source_data_t *source_data, const char *name,
+        const char *match_type, ecr_bwl_type_t *bwtype, ecr_list_t **group_items_out) {
     char *expr, *group;
     ecr_list_t *group_items;
 
-    if (ecr_bwl_type_parse(match_type, bwtype)) {
+    if (ecr_bwl_type_parse(data->bwl, match_type, bwtype)) {
         return -1;
     }
     expr = group = NULL;
@@ -234,22 +254,22 @@ static ecr_bwl_expr_t * ecr_bwl_expr_parse_leaf(ecr_bwl_data_t *data, ecr_bwl_so
     ecr_bwl_user_t *user;
 
     if (!field) {
-        L_ERROR("null field");
+        ecr_bwl_log(data->bwl, LOG_ERR, "null field");
         return NULL;
     }
     match_type = strtok_r(NULL, " \t", expr_save);
     if (!match_type) {
-        L_ERROR("null match type of filed '%s'.", field);
+        ecr_bwl_log(data->bwl, LOG_ERR, "null match type of filed '%s'.", field);
         return NULL;
     }
-    if (ecr_bwl_type_parse(match_type, &bwtype)) {
-        L_ERROR("invalid match type: '%s'", match_type);
+    if (ecr_bwl_type_parse(data->bwl, match_type, &bwtype)) {
+        ecr_bwl_log(data->bwl, LOG_ERR, "invalid match type: '%s'", match_type);
         return NULL;
     }
     if (bwtype != BWL_EXISTS) {
         group = strtok_r(NULL, " \t", expr_save);
         if (!group) {
-            L_ERROR("unexpected end while search for group.");
+            ecr_bwl_log(data->bwl, LOG_ERR, "unexpected end while search for group.");
             return NULL;
         }
     } else {
@@ -264,7 +284,7 @@ static ecr_bwl_expr_t * ecr_bwl_expr_parse_leaf(ecr_bwl_data_t *data, ecr_bwl_so
     } else {
         items = ecr_hashmap_get(&source_data->item_groups, group, strlen(group));
         if (!items) {
-            L_ERROR("undefined group: %s", group);
+            ecr_bwl_log(data->bwl, LOG_ERR, "undefined group: %s", group);
             return NULL;
         }
         for (i = 0; i < ecr_list_size(items); i++) {
@@ -287,7 +307,7 @@ static ecr_bwl_expr_t * ecr_bwl_expr_parse0(ecr_bwl_data_t *data, ecr_bwl_source
 
     token = strtok_r(NULL, " \t", expr_save);
     if (!token) {
-        L_ERROR("unexpected end of expression at %s", *expr_save);
+        ecr_bwl_log(data->bwl, LOG_ERR, "unexpected end of expression at %s", *expr_save);
         return NULL;
     }
     if (expr_left) {
@@ -296,7 +316,7 @@ static ecr_bwl_expr_t * ecr_bwl_expr_parse0(ecr_bwl_data_t *data, ecr_bwl_source
         } else if (strcasecmp(token, "or") == 0 || strcmp(token, "||") == 0 || strcmp(token, "|") == 0) {
             logic = BWL_OR;
         } else {
-            L_ERROR("undefined logic %s at [%s]", token, *expr_save);
+            ecr_bwl_log(data->bwl, LOG_ERR, "undefined logic %s at [%s]", token, *expr_save);
             return NULL;
         }
         expr_right = ecr_bwl_expr_parse0(data, source_data, expr_save, NULL, expr_user_map);
@@ -321,7 +341,7 @@ static ecr_bwl_expr_t * ecr_bwl_expr_parse0(ecr_bwl_data_t *data, ecr_bwl_source
                     expr_left = expr_new;
                 }
             } while (**expr_save);
-            L_ERROR("missing right brace at [%s]", *expr_save);
+            ecr_bwl_log(data->bwl, LOG_ERR, "missing right brace at [%s]", *expr_save);
             return NULL;
         } else if (strcasecmp("not", token) == 0 || strcmp("!", token) == 0) {
             expr_right = ecr_bwl_expr_parse0(data, source_data, expr_save, NULL, expr_user_map);
@@ -477,7 +497,7 @@ static int ecr_bwl_load_item_from_file(ecr_bwl_data_t *data, ecr_list_t *group_i
     }
     fd = fopen(file_name, "r");
     if (NULL == fd) {
-        L_ERROR("can not open file for read: %s", file_name);
+        ecr_bwl_log(data->bwl, LOG_ERR, "can not open file for read: %s", file_name);
         free(file_name);
         return -1;
     }
@@ -554,7 +574,8 @@ static int ecr_bwl_load_stream(ecr_bwl_data_t *data, FILE *stream, ecr_bwl_sourc
         if (isblank(ch)) {
             if (name == NULL || !group_items) {
                 rc = -1;
-                L_ERROR("ecr_bwlist syntax error, no group found at line %d: %s", ln, source->source);
+                ecr_bwl_log(data->bwl, LOG_ERR, "ecr_bwlist syntax error, no group found at line %d: %s", ln,
+                        source->source);
                 break;
             }
             value = ecr_str_trim(line);
@@ -564,7 +585,8 @@ static int ecr_bwl_load_stream(ecr_bwl_data_t *data, FILE *stream, ecr_bwl_sourc
             token = strtok_r(line, " \t\n\r", &save);
             if (!token) {
                 rc = -1;
-                L_ERROR("ecr_bwlist syntax error, group name expected at line %d: %s", ln, source->source);
+                ecr_bwl_log(data->bwl, LOG_ERR, "ecr_bwlist syntax error, group name expected at line %d: %s", ln,
+                        source->source);
                 break;
             }
             if (name) {
@@ -573,7 +595,7 @@ static int ecr_bwl_load_stream(ecr_bwl_data_t *data, FILE *stream, ecr_bwl_sourc
             name = strdup(token);
             if (name[0] == '$') {
                 if (ecr_hashmap_get(&source_data->item_groups, name, strlen(name))) {
-                    L_ERROR("duplicated group: %s", name);
+                    ecr_bwl_log(data->bwl, LOG_ERR, "duplicated group: %s", name);
                     rc = -1;
                     break;
                 }
@@ -587,13 +609,14 @@ static int ecr_bwl_load_stream(ecr_bwl_data_t *data, FILE *stream, ecr_bwl_sourc
                 token = strtok_r(NULL, " \t\n\r", &save);
                 if (!token) {
                     rc = -1;
-                    L_ERROR("ecr_bwlist syntax error, group type expected at line %d: %s", ln, source->source);
+                    ecr_bwl_log(data->bwl, LOG_ERR, "ecr_bwlist syntax error, group type expected at line %d: %s", ln,
+                            source->source);
                     break;
                 }
-                if (ecr_bwl_make_expr(source_data, name, token, &bwtype, &group_items)) {
+                if (ecr_bwl_make_expr(data, source_data, name, token, &bwtype, &group_items)) {
                     rc = -1;
-                    L_ERROR("ecr_bwlist syntax error, unknown group type [%s] at line %d: %s", token, ln,
-                            source->source);
+                    ecr_bwl_log(data->bwl, LOG_ERR, "ecr_bwlist syntax error, unknown group type [%s] at line %d: %s",
+                            token, ln, source->source);
                     break;
                 }
                 token = strtok_r(NULL, " \t\n\r", &save);
@@ -633,12 +656,12 @@ static int ecr_bwl_load_file(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, i
     }
     stream = fopen(bwsource->source, "r");
     if (NULL == stream) {
-        L_ERROR("can not open %s for read: %s", bwsource->source, strerror(errno));
+        ecr_bwl_log(data->bwl, LOG_ERR, "can not open %s for read: %s", bwsource->source, strerror(errno));
         return -1;
     }
     if (crypt) {
         if (!data->bwl->opts.cfile_pwd) {
-            L_ERROR("can not open cfile.");
+            ecr_bwl_log(data->bwl, LOG_ERR, "can not open cfile.");
             return -1;
         }
         stream = ecr_pkware_fdecrypt(stream, data->bwl->opts.cfile_pwd);
@@ -646,7 +669,7 @@ static int ecr_bwl_load_file(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, i
     rc = ecr_bwl_load_stream(data, stream, bwsource);
     if (rc != -1) {
         bwsource->status.file_m_date = st.st_mtim;
-        L_INFO("load %d items from file %s", rc, bwsource->source);
+        ecr_bwl_log(data->bwl, LOG_INFO, "load %d items from file %s", rc, bwsource->source);
     }
     fclose(stream);
     return rc;
@@ -661,13 +684,13 @@ static int ecr_bwl_load_string(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource,
     }
     stream = fmemopen(bwsource->source, strlen(bwsource->source), "r");
     if (NULL == stream) {
-        L_ERROR("fmemopen() error: %s", strerror(errno));
+        ecr_bwl_log(data->bwl, LOG_ERR, "fmemopen() error: %s", strerror(errno));
         return -1;
     }
     rc = ecr_bwl_load_stream(data, stream, bwsource);
     if (rc != -1) {
         bwsource->status.string_ok = 1;
-        L_INFO("load %d items from string %s", rc, bwsource->source);
+        ecr_bwl_log(data->bwl, LOG_INFO, "load %d items from string %s", rc, bwsource->source);
     }
     fclose(stream);
     return rc;
@@ -692,7 +715,7 @@ static int ecr_bwl_load_mongo(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, 
     ecr_bwl_source_data_t *source_data, *source_data_tmp;
 
     if (!data->bwl->opts.mongo_pool) {
-        L_ERROR("no mongo pool configured.");
+        ecr_bwl_log(data->bwl, LOG_ERR, "no mongo pool configured.");
         return -1;
     }
 
@@ -707,7 +730,7 @@ static int ecr_bwl_load_mongo(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, 
 
     count = mongoc_collection_count(collection, MONGOC_QUERY_SLAVE_OK, NULL, 0, 1, NULL, &err);
     if (count == -1) {
-        L_ERROR("mongo connection error: %s[%d]", err.message, err.code);
+        ecr_bwl_log(data->bwl, LOG_ERR, "mongo connection error: %s[%d]", err.message, err.code);
         rc = -1;
         goto l_end;
     }
@@ -720,7 +743,7 @@ static int ecr_bwl_load_mongo(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, 
         bson_destroy(&query);
         bson_destroy(&bson);
         if (n == -1) {
-            L_ERROR("mongo connection error: %s[%d]", err.message, err.code);
+            ecr_bwl_log(data->bwl, LOG_ERR, "mongo connection error: %s[%d]", err.message, err.code);
             rc = -1;
             goto l_end;
         }
@@ -736,13 +759,13 @@ static int ecr_bwl_load_mongo(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, 
     while (!mongoc_cursor_error(cursor, &err) && mongoc_cursor_more(cursor)) {
         if (mongoc_cursor_next(cursor, &doc)) {
             if (!bson_iter_init_find(&i, doc, "match_type") || bson_iter_type(&i) != BSON_TYPE_UTF8) {
-                L_ERROR("can not find field 'match_type' of type string");
+                ecr_bwl_log(data->bwl, LOG_ERR, "can not find field 'match_type' of type string");
                 rc = -1;
                 goto l_end;
             }
             match_type = bson_iter_utf8(&i, NULL);
             if (!bson_iter_init_find(&i, doc, "field") || bson_iter_type(&i) != BSON_TYPE_UTF8) {
-                L_ERROR("can not find field 'field' of type string");
+                ecr_bwl_log(data->bwl, LOG_ERR, "can not find field 'field' of type string");
                 rc = -1;
                 goto l_end;
             }
@@ -753,7 +776,7 @@ static int ecr_bwl_load_mongo(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, 
                 tag = NULL;
             }
             if (!bson_iter_init_find(&i, doc, "m_date") || bson_iter_type(&i) != BSON_TYPE_DATE_TIME) {
-                L_ERROR("can not find field 'm_date' of type datetime");
+                ecr_bwl_log(data->bwl, LOG_ERR, "can not find field 'm_date' of type datetime");
                 rc = -1;
                 goto l_end;
             }
@@ -764,8 +787,8 @@ static int ecr_bwl_load_mongo(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, 
                 source_data->id = data->bwl->next_sid++;
                 source_data->user = strdup(tag);
             }
-            if (ecr_bwl_make_expr(source_data, field, match_type, &bwtype, &group_items)) {
-                L_ERROR("invalid match_type: '%s'", match_type);
+            if (ecr_bwl_make_expr(data, source_data, field, match_type, &bwtype, &group_items)) {
+                ecr_bwl_log(data->bwl, LOG_ERR, "invalid match_type: '%s'", match_type);
                 rc = -1;
                 goto l_end;
             }
@@ -774,7 +797,7 @@ static int ecr_bwl_load_mongo(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, 
             case BWL_WUMANBER:
             case BWL_REGEX:
                 if (!bson_iter_init_find(&i, doc, "items") || bson_iter_type(&i) != BSON_TYPE_ARRAY) {
-                    L_ERROR("can not find field 'items' of type array");
+                    ecr_bwl_log(data->bwl, LOG_ERR, "can not find field 'items' of type array");
                     rc = -1;
                     goto l_end;
                 }
@@ -804,7 +827,7 @@ static int ecr_bwl_load_mongo(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, 
     }
 
     if (mongoc_cursor_error(cursor, &err)) {
-        L_ERROR("mongo cursor error: %s[%d]", err.message, err.code);
+        ecr_bwl_log(data->bwl, LOG_ERR, "mongo cursor error: %s[%d]", err.message, err.code);
         rc = -1;
         goto l_end;
     }
@@ -825,7 +848,7 @@ static int ecr_bwl_load_mongo(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, 
         if (rc >= 0) {
             bwsource->status.mongo.doc_count = count;
             bwsource->status.mongo.m_date = m_date;
-            L_INFO("load %d items from mongo collection %s", rc, bwsource->source);
+            ecr_bwl_log(data->bwl, LOG_INFO, "load %d items from mongo collection %s", rc, bwsource->source);
         }
         return rc;
     }
@@ -972,44 +995,46 @@ static int ecr_bwl_reload0(ecr_bwl_t *list, int force) {
     return 0;
 }
 
-static inline void ecr_bwl_add_matched(ecr_bwl_result_t *result, ecr_list_t *users) {
-    int i;
+static inline void ecr_bwl_add_matched(ecr_bwl_result_t *result, ecr_list_t *users, ecr_str_t *item) {
+    int i, expr_id;
     size_t size;
 
     size = ecr_list_size(users);
     for (i = 0; i < size; i++) {
-        result->exprs.ptr[((ecr_bwl_user_t*) users->data[i])->expr_id] = 1;
+        expr_id = ((ecr_bwl_user_t*) users->data[i])->expr_id;
+        result->exprs.ptr[expr_id] = 1;
+        result->expr_items[expr_id] = item;
     }
 }
 
-static int ecr_bwl_wm_match_handler(ecr_wm_t *wm, const char *str, size_t len, ecr_list_t *matched_users, void *user) {
+static int ecr_bwl_wm_match_handler(ecr_wm_t *wm, const char *str, size_t len, ecr_wm_pattern_t *pattern, void *user) {
     ecr_bwl_result_t *results = user;
-    ecr_bwl_add_matched(results, matched_users);
+    ecr_bwl_add_matched(results, &pattern->users, &pattern->pattern);
     return 0;
 }
 
 static void ecr_bwl_match_one(ecr_bwl_group_t *group, ecr_str_t *hdr, ecr_bwl_result_t *results) {
     ecr_list_t *users;
     ecr_hashmap_iter_t it;
-    regex_t * reg;
+    ecr_bwl_regex_t *reg;
 
     switch (group->type) {
     case BWL_EQUALS:
         if ((users = ecr_hashmap_get(&group->items.equals, hdr->ptr, hdr->len)) != NULL) {
-            ecr_bwl_add_matched(results, users);
+            ecr_bwl_add_matched(results, users, hdr);
         }
         break;
     case BWL_WUMANBER:
         ecr_wm_match_ex(&group->items.wumanber, hdr->ptr, hdr->len, ecr_bwl_wm_match_handler, results);
         break;
     case BWL_EXISTS:
-        ecr_bwl_add_matched(results, &group->items.exists);
+        ecr_bwl_add_matched(results, &group->items.exists, NULL);
         break;
     case BWL_REGEX:
         ecr_hashmap_iter_init(&it, &group->items.regex);
         while (ecr_hashmap_iter_next(&it, (void **) &reg, NULL, (void**) &users) == 0) {
-            if (regexec(reg, hdr->ptr, 0, NULL, 0) == 0) {
-                ecr_bwl_add_matched(results, users);
+            if (regexec(&reg->regex, hdr->ptr, 0, NULL, 0) == 0) {
+                ecr_bwl_add_matched(results, users, &reg->pattern);
             }
         }
         break;
@@ -1038,6 +1063,9 @@ int ecr_bwl_init(ecr_bwl_t *list, ecr_bwl_opt_t *opt) {
         if (opt->fixedhash_ctx) {
             list->opts.fixedhash_ctx = opt->fixedhash_ctx;
         }
+        if (opt->log_handler) {
+            list->opts.log_handler = opt->log_handler;
+        }
     }
 
     list->next_sid = 1;
@@ -1058,7 +1086,7 @@ int ecr_bwl_add(ecr_bwl_t *list, const char *source, ecr_bwl_logic_t logic, void
     ecr_bwl_source_t *bwsource;
 
     if (logic != BWL_AND && logic != BWL_OR) {
-        L_ERROR("invalid logic: %s", logic);
+        ecr_bwl_log(list, LOG_ERR, "invalid logic: %d", logic);
         return -1;
     }
 
@@ -1080,7 +1108,7 @@ int ecr_bwl_add(ecr_bwl_t *list, const char *source, ecr_bwl_logic_t logic, void
         bwsource->source_type = BWL_STRING;
         bwsource->source = strdup(source + strlen(ECR_BWL_SOURCE_STRING));
     } else {
-        L_ERROR("invalid source: %s", source);
+        ecr_bwl_log(list, LOG_ERR, "invalid source: %s", source);
         free(bwsource);
         return -1;
     }
@@ -1115,6 +1143,8 @@ ecr_bwl_result_t * ecr_bwl_result_init_mem(ecr_bwl_t *list, void *mem) {
     ret->sources.ptr = chmem;
     chmem += (ret->users_size = ret->sources.len = list->next_sid);
     ret->users = (void**) chmem;
+    chmem += ret->users_size * sizeof(void*);
+    ret->expr_items = (ecr_str_t**) chmem;
 
     return ret;
 }
@@ -1126,6 +1156,7 @@ ecr_bwl_result_t * ecr_bwl_result_init(ecr_bwl_t *list) {
     ret->users_size = ret->sources.len = list->next_sid;
     ret->sources.ptr = calloc(1, ret->sources.len);
     ret->users = calloc(ret->users_size, sizeof(void*));
+    ret->expr_items = calloc(ret->exprs.len, sizeof(ecr_str_t*));
     return ret;
 }
 
@@ -1133,12 +1164,14 @@ void ecr_bwl_result_clear(ecr_bwl_result_t *result) {
     memset(result->sources.ptr, 0, result->sources.len);
     memset(result->exprs.ptr, 0, result->exprs.len);
     memset(result->users, 0, result->users_size * sizeof(void*));
+    memset(result->expr_items, 0, result->exprs.len * sizeof(ecr_str_t*));
 }
 
 void ecr_bwl_result_destroy(ecr_bwl_result_t *result) {
     free(result->users);
     free(result->sources.ptr);
     free(result->exprs.ptr);
+    free(result->expr_items);
     free(result);
 }
 
@@ -1150,7 +1183,7 @@ int ecr_bwl_matches_fixed(ecr_bwl_t *list, ecr_fixedhash_t *hash, ecr_bwl_result
     ecr_bwl_data_t *data;
 
     if (!list->opts.fixedhash_ctx) {
-        L_ERROR("no fixedhash context specified.");
+        ecr_bwl_log(list, LOG_ERR, "no fixedhash context specified.");
         return -1;
     }
 

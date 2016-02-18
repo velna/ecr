@@ -69,6 +69,7 @@ libecr_la_SOURCES = \
 	ecr/ecr_tlv.c \
 	ecr/ecr_uncap.c \
 	ecr/ecr_util.c \
+	ecr/ecr_util_base64.c \
 	ecr/ecr_util_hash.c \
 	ecr/ecr_util_inet.c \
 	ecr/ecr_util_string.c \

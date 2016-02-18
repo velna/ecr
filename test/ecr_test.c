@@ -176,7 +176,11 @@ void test_bwlist(const char *bwlist_file) {
     printf("result: %d\n", ecr_bwl_contains(result, id));
     printf("%p\n", result->users[id]);
     for (i = 1; i < bwlist.data->next_expr_id; i++) {
-        printf("%d=%hhd\n", i, result->exprs.ptr[i]);
+        if (result->expr_items[i]) {
+            printf("%d=%hhd, %s\n", i, result->exprs.ptr[i], result->expr_items[i]->ptr);
+        } else {
+            printf("%d=%hhd\n", i, result->exprs.ptr[i]);
+        }
     }
 
     ecr_bwl_reload(&bwlist);
@@ -185,7 +189,11 @@ void test_bwlist(const char *bwlist_file) {
     printf("result: %d\n", ecr_bwl_contains(result, id));
     printf("%p\n", result->users[id]);
     for (i = 1; i < bwlist.data->next_expr_id; i++) {
-        printf("%d=%hhd\n", i, result->exprs.ptr[i]);
+        if (result->expr_items[i]) {
+            printf("%d=%hhd, %s\n", i, result->exprs.ptr[i], result->expr_items[i]->ptr);
+        } else {
+            printf("%d=%hhd\n", i, result->exprs.ptr[i]);
+        }
     }
 
     ecr_bwl_result_destroy(result);
@@ -225,6 +233,6 @@ void ecr_version_test() {
 }
 
 int main(int argc, char **argv) {
-    ecr_version_test();
+    test_bwlist(argv[1]);
     return EXIT_SUCCESS;
 }
