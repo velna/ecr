@@ -619,6 +619,9 @@ static int ecr_bwl_load_stream(ecr_bwl_data_t *data, FILE *stream, ecr_bwl_sourc
                             token, ln, source->source);
                     break;
                 }
+                if (bwtype == BWL_EXISTS) {
+                    rc++;
+                }
                 token = strtok_r(NULL, " \t\n\r", &save);
                 if (token && group_items) {
                     frc = ecr_bwl_load_item_from_file(data, group_items, token);

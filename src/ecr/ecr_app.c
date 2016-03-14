@@ -59,11 +59,34 @@ static void * ecr_app_signal_routine(void *user) {
     return NULL;
 }
 
+static void ecr_app_mongo_log_handler(mongoc_log_level_t log_level, const char *log_domain, const char *message,
+        void *user_data) {
+    L_INFO("%s: %s", log_domain, message);
+}
+
+static void ecr_app_kafka_logger(const rd_kafka_t *rk, int level, const char *fac, const char *buf) {
+    L_LOG(level, "%s: %s", rd_kafka_name(rk), buf);
+}
+
 int ecr_app_init(ecr_app_t *app, int argc, char **argv) {
     int opt;
     struct tm stm;
     pthread_attr_t attr;
     pthread_t thread;
+
+    ecr_config_line_t app_config_lines[] = {
+    //
+            { "home", &app->config.home, ECR_CFG_STRING }, //
+            { "main_loop_interval", &app->config.main_loop_interval, ECR_CFG_INT, .dv.i = 2 }, //
+            { "fork_process", &app->config.fork_process, ECR_CFG_INT, .dv.i = 0 }, //
+            { "log_file", &app->config.log_file, ECR_CFG_STRING }, //
+            { "stat_log_file", &app->config.stat_log_file, ECR_CFG_STRING }, //
+            { "cmd_zmq_bind", &app->config.cmd_zmq_bind, ECR_CFG_STRING }, //
+            { "pid_file", &app->config.pid_file, ECR_CFG_STRING }, //
+            { "zmq_io_thread_count", &app->config.zmq_io_thread_count, ECR_CFG_INT, .dv.i = 1 }, //
+            { "mongo_uri", &app->config.mongo_uri, ECR_CFG_STRING }, //
+            { "kafka_brokers", &app->config.kafka_brokers, ECR_CFG_STRING }, //
+            { 0 } };
 
     assert(app && argc >= 0 && argv);
     memset(app, 0, sizeof(ecr_app_t));
@@ -86,45 +109,32 @@ int ecr_app_init(ecr_app_t *app, int argc, char **argv) {
         ecr_config_destroy(&app->config_props);
         return -1;
     }
-    if (ecr_config_get(&app->config_props, NULL, "app_home", ECR_CFG_STRING, &app->config.app_home)) {
-        L_ERROR("app_home not configured.");
+    ecr_config_load(&app->config_props, "app", app_config_lines);
+
+    if (!app->config.home) {
+        L_ERROR("home not configured.");
         return -1;
     }
-    if (chdir(app->config.app_home)) {
-        L_ERROR("can not change work dir to %s.", app->config.app_home);
+    if (chdir(app->config.home)) {
+        L_ERROR("can not change work dir to %s.", app->config.home);
         return -1;
-    }
-    if (ecr_config_get(&app->config_props, NULL, "app_main_loop_interval", ECR_CFG_INT,
-            &app->config.app_main_loop_interval)) {
-        app->config.app_main_loop_interval = 2;
-    }
-    if (ecr_config_get(&app->config_props, NULL, "app_fork_process", ECR_CFG_INT, &app->config.app_fork_process)) {
-        app->config.app_fork_process = 0;
-    }
-    ecr_config_get(&app->config_props, NULL, "app_log_file", ECR_CFG_STRING, &app->config.app_log_file);
-    ecr_config_get(&app->config_props, NULL, "app_stat_log_file", ECR_CFG_STRING, &app->config.app_stat_log_file);
-    ecr_config_get(&app->config_props, NULL, "app_cmd_zmq_bind", ECR_CFG_STRING, &app->config.app_cmd_zmq_bind);
-    ecr_config_get(&app->config_props, NULL, "app_pid_file", ECR_CFG_STRING, &app->config.app_pid_file);
-    if (ecr_config_get(&app->config_props, NULL, "app_zmq_io_thread_count", ECR_CFG_INT,
-            &app->config.app_zmq_io_thread_count)) {
-        app->config.app_zmq_io_thread_count = 1;
     }
 
-    if (app->config.app_fork_process) {
+    if (app->config.fork_process) {
         app->pid = fork();
         if (app->pid < 0) {
             L_ERROR("error fork process!");
             return -1;
         } else if (app->pid > 0) {
             L_INFO("forked process: %d", app->pid);
-            ecr_echo_pid(app->pid, app->config.app_pid_file);
+            ecr_echo_pid(app->pid, app->config.pid_file);
             return 1;
         } else {
             app->pid = getpid();
         }
     } else {
         app->pid = getpid();
-        ecr_echo_pid(app->pid, app->config.app_pid_file);
+        ecr_echo_pid(app->pid, app->config.pid_file);
     }
 
     sigemptyset(&app->sigset);
@@ -136,12 +146,12 @@ int ecr_app_init(ecr_app_t *app, int argc, char **argv) {
     pthread_create(&thread, &attr, ecr_app_signal_routine, app);
     pthread_attr_destroy(&attr);
 
-    if (app->config.app_log_file != NULL) {
-        app->log_file = ecr_logger_init(app->config.app_log_file);
+    if (app->config.log_file != NULL) {
+        app->log_file = ecr_logger_init(app->config.log_file);
     }
 
-    if (app->config.app_log_file != NULL) {
-        app->stat_log_file = ecr_logger_open(app->config.app_stat_log_file);
+    if (app->config.log_file != NULL) {
+        app->stat_log_file = ecr_logger_open(app->config.stat_log_file);
     } else {
         app->stat_log_file = ECR_LOG_FILE;
     }
@@ -164,16 +174,51 @@ int ecr_app_init(ecr_app_t *app, int argc, char **argv) {
 
     // init cmd
     app->zmq_ctx = zmq_ctx_new();
-    zmq_ctx_set(app->zmq_ctx, ZMQ_IO_THREADS, app->config.app_zmq_io_thread_count);
-    if (app->config.app_cmd_zmq_bind) {
-        if (ecr_cmd_ctx_init(&app->cmd_ctx, app->zmq_ctx, app->config.app_cmd_zmq_bind) == 0) {
+    zmq_ctx_set(app->zmq_ctx, ZMQ_IO_THREADS, app->config.zmq_io_thread_count);
+    if (app->config.cmd_zmq_bind) {
+        if (ecr_cmd_ctx_init(&app->cmd_ctx, app->zmq_ctx, app->config.cmd_zmq_bind) == 0) {
             ecr_cmd_register(&app->cmd_ctx, "sys", ecr_sys_cmd_handler, "system control commands.");
         } else {
-            L_ERROR("cmd zmq init error, bind at: %s.", app->config.app_cmd_zmq_bind);
+            L_ERROR("cmd zmq init error, bind at: %s.", app->config.cmd_zmq_bind);
             return -1;
         }
     } else {
         L_WARN("cmd zmq is not configured.");
+    }
+
+    // init mongo
+    if (app->config.mongo_uri) {
+        mongoc_init();
+        mongoc_log_set_handler(ecr_app_mongo_log_handler, NULL);
+        mongoc_uri_t *uri = mongoc_uri_new(app->config.mongo_uri);
+        app->mongo_pool = mongoc_client_pool_new(uri);
+        mongoc_uri_destroy(uri);
+        if (!app->mongo_pool) {
+            L_ERROR("mongo connect field at %s", app->config.mongo_uri);
+            return -1;
+        }
+        L_INFO("mongo connected at %s", app->config.mongo_uri);
+    }
+
+    // init kafka
+    if (app->config.kafka_brokers) {
+        rd_kafka_conf_t *conf = rd_kafka_conf_new();
+        char errstr[512];
+        app->kafka = rd_kafka_new(RD_KAFKA_PRODUCER, conf, errstr, sizeof(errstr));
+        rd_kafka_conf_destroy(conf);
+        if (!app->kafka) {
+            L_ERROR("error init kafka: %s", errstr);
+            return -1;
+        }
+        rd_kafka_set_logger(app->kafka, ecr_app_kafka_logger);
+        rd_kafka_set_log_level(app->kafka, LOG_INFO);
+
+        if (rd_kafka_brokers_add(app->kafka, app->config.kafka_brokers) == 0) {
+            L_ERROR("error add kafka brokers %s: %s", app->config.kafka_brokers,
+                    rd_kafka_err2str(rd_kafka_errno2err(errno)));
+            return -1;
+        }
+        L_INFO("kafka brokers connected at %s", app->config.kafka_brokers);
     }
 
     return 0;
@@ -244,7 +289,7 @@ int ecr_app_startup(ecr_app_t *app, ecr_list_t *modules) {
     size = 0;
     stream = open_memstream(&stat_string, &size);
     while (app->running) {
-        sleep(app->config.app_main_loop_interval);
+        sleep(app->config.main_loop_interval);
         stack.idx = 0;
         fprintf(stream, "%s\t%s\t%s\t%s\n", "column", "total", "pps(avg)", "pss(stat_interval)");
         fprintf(stream, "startup_time:\t%s\n", app->startup_time_str);
@@ -279,6 +324,19 @@ int ecr_app_startup(ecr_app_t *app, ecr_list_t *modules) {
         }
 
         zmq_ctx_term(app->zmq_ctx);
+
+        if (app->mongo_pool) {
+            mongoc_client_pool_destroy(app->mongo_pool);
+            mongoc_cleanup();
+            app->mongo_pool = NULL;
+            L_INFO("mongo pool destroied.");
+        }
+
+        if (app->kafka) {
+            rd_kafka_destroy(app->kafka);
+            rd_kafka_wait_destroyed(1000);
+            app->kafka = NULL;
+        }
 
         L_INFO("goodbye.");
 

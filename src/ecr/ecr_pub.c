@@ -50,28 +50,28 @@ int ecr_pub_output_config(ecr_pub_t *pub, ecr_config_t *config) {
     ecr_config_load(config, pub->id, config_lines);
     if (file_config.format && file_config.file.name) {
         if (ecr_pub_output_add(pub, &file_config)) {
-            error = 1;
+            error++;
         } else {
-            ok = 1;
+            ok++;
         }
     }
     if (zmq_config.format && zmq_config.zmq.endpoint) {
         if (ecr_pub_output_add(pub, &zmq_config)) {
-            error = 1;
+            error++;
         } else {
-            ok = 1;
+            ok++;
         }
     }
     if (kafka_config.format && kafka_config.kafka.topic) {
         if (ecr_pub_output_add(pub, &kafka_config)) {
-            error = 1;
+            error++;
         } else {
-            ok = 1;
+            ok++;
         }
     }
     if (!ok) {
         if (ecr_pub_output_add(pub, &stat_config)) {
-            error = 1;
+            error++;
         }
     }
     return error ? -1 : 0;
@@ -267,6 +267,9 @@ void ecr_pub_destroy(ecr_pub_t *pub) {
     int i, j;
     FILE *file;
 
+    if (!pub->id) {
+        return;
+    }
     L_INFO("destroy pub %s", pub->id);
     while (output) {
         if (pub->config.output_destroy_cb) {

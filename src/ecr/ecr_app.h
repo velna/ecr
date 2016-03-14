@@ -15,18 +15,22 @@
 #include "ecr_list.h"
 #include "ecr_counter.h"
 #include <signal.h>
+#include <mongoc.h>
+#include <librdkafka/rdkafka.h>
 
 typedef struct ecr_app_module_s ecr_app_module_t;
 
 typedef struct {
-    char *app_home;
-    int app_main_loop_interval;
-    char * app_log_file;
-    char * app_stat_log_file;
-    char * app_pid_file;
-    int app_fork_process;
-    char *app_cmd_zmq_bind;
-    int app_zmq_io_thread_count;
+    char *home;
+    int main_loop_interval;
+    char *log_file;
+    char *stat_log_file;
+    char *pid_file;
+    int fork_process;
+    char *cmd_zmq_bind;
+    int zmq_io_thread_count;
+    char *mongo_uri;
+    char *kafka_brokers;
 } ecr_app_config_t;
 
 typedef struct {
@@ -47,6 +51,8 @@ typedef struct {
     ecr_cmd_ctx_t cmd_ctx;
     ecr_counter_ctx_t counter_ctx;
     sigset_t sigset;
+    mongoc_client_pool_t *mongo_pool;
+    rd_kafka_t *kafka;
 } ecr_app_t;
 
 typedef struct {

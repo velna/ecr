@@ -76,10 +76,17 @@ static void ecr_server_worker_init(ecr_server_t *server, ecr_server_worker_t *wo
 }
 
 int ecr_server_init(ecr_server_t *server, ecr_server_config_t *config) {
+    char *pool_size;
     memset(server, 0, sizeof(ecr_server_t));
     server->config = *config;
     server->config.pipe_file_path = strdup(config->pipe_file_path);
     server->config.name = strdup(config->name);
+
+    if (config->thread_pool_size) {
+        asprintf(&pool_size, "%d", config->thread_pool_size);
+        setenv("UV_THREADPOOL_SIZE", pool_size, 1);
+        free(pool_size);
+    }
 
     ecr_server_worker_init(server, &server->master, -1);
     server->master_socket = malloc(sizeof(uv_tcp_t));

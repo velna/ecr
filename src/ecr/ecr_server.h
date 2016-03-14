@@ -49,6 +49,7 @@ typedef struct {
     char *name;
     char *pipe_file_path;
     int num_workers;
+    int thread_pool_size;
     ecr_server_accept_cb accept_cb;
     ecr_server_error_cb error_cb;
     int tcp_nodelay;
