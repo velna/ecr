@@ -33,12 +33,13 @@ void ecr_cmd_response(ecr_cmd_ctx_t *ctx, const void *message, size_t size, int 
     pthread_mutex_unlock(&ctx->zmq_mutex);
 }
 
-static int ecr_cmd_parse_v2(char *cmd, size_t size, int *argc_out, char ***argv_out) {
-    char *cmd_s = NULL, *arg, **argv;
+static int ecr_cmd_parse_v2(char *str, size_t size, int *argc_out, char ***argv_out) {
+    char *cmd, *cmd_s = NULL, *arg, **argv;
     int i, argc, rc;
 
     ecr_list_t list;
     ecr_list_init(&list, 16);
+    cmd = strndup(str, size);
     arg = strtok_r(cmd, " \t", &cmd_s);
     while (arg) {
         ecr_list_add(&list, arg);
@@ -57,6 +58,7 @@ static int ecr_cmd_parse_v2(char *cmd, size_t size, int *argc_out, char ***argv_
         rc = -1;
     }
     ecr_list_destroy(&list, NULL);
+    free(cmd);
     return rc;
 }
 
