@@ -49,7 +49,7 @@ static int ecr_cmd_parse_v2(char *str, size_t size, int *argc_out, char ***argv_
     if (argc > 0) {
         argv = calloc(argc, sizeof(char*));
         for (i = 0; i < argc; i++) {
-            argv[i] = (char *) ecr_list_get(&list, i);
+            argv[i] = strdup((char *) ecr_list_get(&list, i));
         }
         *argc_out = argc;
         *argv_out = argv;
@@ -81,6 +81,9 @@ static int ecr_cmd_parse_v1(char *cmd, size_t size, int *argc_out, char ***argv_
     if (i != argc || cp >= end) {
         free(argv);
         return -1;
+    }
+    for (i = 0; i < argc; i++) {
+        argv[i] = strdup(argv[i]);
     }
     *argc_out = argc;
     *argv_out = argv;
@@ -126,6 +129,9 @@ static void * ecr_cmd_routine(void *user) {
                     ecr_cmd_response(ctx, response.ptr, response.len, 0);
                 } else {
                     ecr_cmd_response(ctx, "(unknown command)", 0, 0);
+                }
+                for (i = 0; i < argc; i++) {
+                    free(argv[i]);
                 }
                 free(argv);
             } else {
