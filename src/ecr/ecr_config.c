@@ -92,7 +92,7 @@ int ecr_config_init_str(ecr_config_t *cfg, const char *str) {
         return 0;
     }
     s = strdup(str);
-    name = strtok_r(s, ", ", &ss);
+    name = strtok_r(s, ", &", &ss);
     while (name) {
         if ((value = strchr(name, '='))) {
             value[0] = '\0';
@@ -107,7 +107,7 @@ int ecr_config_init_str(ecr_config_t *cfg, const char *str) {
             free_to_null(cvalue->value);
             free_to_null(cvalue);
         }
-        name = strtok_r(NULL, ", ", &ss);
+        name = strtok_r(NULL, ", &", &ss);
     }
     free(s);
 
