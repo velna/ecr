@@ -126,7 +126,7 @@ void * ecr_zmq_init(const char *endpoint, const char *options, void *zmq_ctx) {
     }
 
     if (ecr_config_init_str(&config, options) || ecr_config_load(&config, NULL, cfg_lines)
-            || ecr_config_print_unused(&config)) {
+            || ecr_config_print_unused(NULL, &config)) {
         L_ERROR("invalid zmq file options: %s", options);
         ecr_config_destroy(&config);
         return NULL;

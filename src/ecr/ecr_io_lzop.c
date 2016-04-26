@@ -332,12 +332,12 @@ FILE * ecr_lzop_open(FILE *file, const char *options) {
     ecr_config_line_t cfg_lines[] = {
 //
             { "mode", &smode, ECR_CFG_STRING }, //
-            { "bufsize", &buf_size, ECR_CFG_INT, .dv.i=LZOPBUFSIZE }, // fixed buffer size
+            { "bufsize", &buf_size, ECR_CFG_INT, .dv.i = LZOPBUFSIZE }, // fixed buffer size
             { 0 } };
 
     ecr_lzop_file_t *lzopfile = calloc(1, sizeof(ecr_lzop_file_t));
     if (ecr_config_init_str(&lzopfile->config, options) || ecr_config_load(&lzopfile->config, NULL, cfg_lines)
-            || ecr_config_print_unused(&lzopfile->config)) {
+            || ecr_config_print_unused(NULL, &lzopfile->config)) {
         L_ERROR("invalid lzop options: %s", options);
         ecr_config_destroy(&lzopfile->config);
         free(lzopfile);

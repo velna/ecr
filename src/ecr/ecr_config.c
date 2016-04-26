@@ -391,7 +391,7 @@ int ecr_config_load(ecr_config_t *cfg, const char *group, ecr_config_line_t *con
     return 0;
 }
 
-int ecr_config_print_unused(ecr_config_t *cfg) {
+int ecr_config_print_unused(FILE *out, ecr_config_t *cfg) {
     ecr_hashmap_iter_t i;
     char *name;
     ecr_config_value_t *value;
@@ -401,7 +401,11 @@ int ecr_config_print_unused(ecr_config_t *cfg) {
     while (ecr_hashmap_iter_next(&i, (void**) &name, NULL, (void**) &value) == 0) {
         if (!value->used) {
             c++;
-            L_WARN("unknown config: %s=%s", name, value->value);
+            if (out) {
+                fprintf(out, "%s=%s", name, value->value);
+            } else {
+                L_WARN("unknown config: %s=%s", name, value->value);
+            }
         }
     }
     return c;
