@@ -482,7 +482,7 @@ static void ecr_bwl_expr_dump(ecr_bwl_expr_t *expr, FILE *stream) {
     }
 }
 
-static int ecr_bwl_load_item_from_file(ecr_bwl_data_t *data, ecr_list_t *group_items, const char *file) {
+static int ecr_bwl_load_item_from_file(ecr_bwl_data_t *data, ecr_list_t *group_items, const char *file, int crypt) {
     char *line, *value, *file_name;
     size_t len;
     ssize_t nread;
@@ -500,6 +500,19 @@ static int ecr_bwl_load_item_from_file(ecr_bwl_data_t *data, ecr_list_t *group_i
         ecr_bwl_log(data->bwl, LOG_ERR, "can not open file for read: %s", file_name);
         free(file_name);
         return -1;
+    }
+    if (crypt) {
+        if (!data->bwl->opts.cfile_pwd) {
+            ecr_bwl_log(data->bwl, LOG_ERR, "can not open cfile: %s", file_name);
+            free(file_name);
+            return -1;
+        }
+        fd = ecr_pkware_fdecrypt(fd, data->bwl->opts.cfile_pwd);
+        if (!fd) {
+            ecr_bwl_log(data->bwl, LOG_ERR, "invalid cfile: %s", file_name);
+            free(file_name);
+            return -1;
+        }
     }
     free(file_name);
     len = 256;
@@ -546,7 +559,7 @@ static int ecr_bwl_source_data_add(ecr_bwl_source_data_t *source_data, ecr_bwl_d
     return 0;
 }
 
-static int ecr_bwl_load_stream(ecr_bwl_data_t *data, FILE *stream, ecr_bwl_source_t *source) {
+static int ecr_bwl_load_stream(ecr_bwl_data_t *data, FILE *stream, ecr_bwl_source_t *source, int crypt) {
     char *line, *oline, ch, *token, *save, *name, *value, *expr;
     ecr_list_t *group_items;
     size_t len;
@@ -624,7 +637,7 @@ static int ecr_bwl_load_stream(ecr_bwl_data_t *data, FILE *stream, ecr_bwl_sourc
                 }
                 token = strtok_r(NULL, " \t\n\r", &save);
                 if (token && group_items) {
-                    frc = ecr_bwl_load_item_from_file(data, group_items, token);
+                    frc = ecr_bwl_load_item_from_file(data, group_items, token, crypt);
                     if (-1 == frc) {
                         rc = -1;
                         break;
@@ -664,12 +677,16 @@ static int ecr_bwl_load_file(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, i
     }
     if (crypt) {
         if (!data->bwl->opts.cfile_pwd) {
-            ecr_bwl_log(data->bwl, LOG_ERR, "can not open cfile.");
+            ecr_bwl_log(data->bwl, LOG_ERR, "can not open cfile: %s", bwsource->source);
             return -1;
         }
         stream = ecr_pkware_fdecrypt(stream, data->bwl->opts.cfile_pwd);
+        if (!stream) {
+            ecr_bwl_log(data->bwl, LOG_ERR, "invalid cfile: %s", bwsource->source);
+            return -1;
+        }
     }
-    rc = ecr_bwl_load_stream(data, stream, bwsource);
+    rc = ecr_bwl_load_stream(data, stream, bwsource, crypt);
     if (rc != -1) {
         bwsource->status.file_m_date = st.st_mtim;
         ecr_bwl_log(data->bwl, LOG_INFO, "load %d items from file %s", rc, bwsource->source);
@@ -690,7 +707,7 @@ static int ecr_bwl_load_string(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource,
         ecr_bwl_log(data->bwl, LOG_ERR, "fmemopen() error: %s", strerror(errno));
         return -1;
     }
-    rc = ecr_bwl_load_stream(data, stream, bwsource);
+    rc = ecr_bwl_load_stream(data, stream, bwsource, 0);
     if (rc != -1) {
         bwsource->status.string_ok = 1;
         ecr_bwl_log(data->bwl, LOG_INFO, "load %d items from string %s", rc, bwsource->source);
@@ -1069,6 +1086,9 @@ int ecr_bwl_init(ecr_bwl_t *list, ecr_bwl_opt_t *opt) {
         if (opt->log_handler) {
             list->opts.log_handler = opt->log_handler;
         }
+        if (opt->cfile_pwd) {
+            list->opts.cfile_pwd = strdup(opt->cfile_pwd);
+        }
     }
 
     list->next_sid = 1;
@@ -1082,6 +1102,8 @@ void ecr_bwl_destroy(ecr_bwl_t *list) {
     ecr_bwl_data_destroy(list->tmp_data);
     free_to_null(list->data);
     free_to_null(list->tmp_data);
+    free_to_null(list->opts.basepath);
+    free_to_null(list->opts.cfile_pwd);
     ecr_list_destroy(&list->source_list, ecr_bwl_free_source_handler);
 }
 

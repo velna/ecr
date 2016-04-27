@@ -62,9 +62,9 @@ typedef struct ecr_bwl_expr_s {
 
 typedef struct {
     mongoc_client_pool_t *mongo_pool;
-    const char *basepath;
+    char *basepath;
     ecr_fixedhash_ctx_t *fixedhash_ctx;
-    const char *cfile_pwd;
+    char *cfile_pwd;
     ecr_bwl_log_handler log_handler;
 } ecr_bwl_opt_t;
 
