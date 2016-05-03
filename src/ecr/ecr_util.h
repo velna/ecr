@@ -245,4 +245,6 @@ uint32_t ecr_random_next();
 
 const char * ecr_inet_ntop(int af, const void *src, char *dst, size_t size);
 
+int ecr_mkdirs(const char *path, mode_t mode);
+
 #endif /* ECR_UTIL_H_ */

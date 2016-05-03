@@ -14,6 +14,9 @@
 #include <time.h>
 #include <sys/time.h>
 #include <sys/prctl.h>
+#include <sys/stat.h>
+#include <libgen.h>
+#include <errno.h>
 
 static char ecr_HEXS[] = "0123456789abcdef";
 
@@ -309,4 +312,37 @@ uint32_t ecr_random_next() {
         ecr_radom_seed_ -= M;
     }
     return ecr_radom_seed_;
+}
+
+int ecr_mkdirs(const char *path, mode_t mode) {
+    char *dir, *s;
+    int rc;
+    struct stat st;
+    if (stat(path, &st) == 0) {
+        if (S_ISDIR(st.st_mode)) {
+//            printf("dir %s\n", path);
+            rc = 0;
+        } else {
+            errno = ENOTDIR;
+//            printf("not dir %s\n", path);
+            rc = -1;
+        }
+    } else {
+        rc = -1;
+//        printf("stat %s: %s[%d]\n", path, strerror(errno), errno);
+        switch (errno) {
+        case ENOENT:
+            s = strdup(path);
+            dir = dirname(s);
+            if (dir) {
+                if (ecr_mkdirs(dir, mode) == 0) {
+                    rc = mkdir(path, mode);
+//                    printf("mkdir %s: %s[%d]\n", path, strerror(errno), errno);
+                }
+            }
+            free(s);
+            break;
+        }
+    }
+    return rc;
 }

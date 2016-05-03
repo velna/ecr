@@ -18,6 +18,7 @@
 #include <grp.h>
 #include <sys/syscall.h>
 #include <sys/stat.h>
+#include <libgen.h>
 
 #define P_NONE  0
 #define P_TIME  1
@@ -43,6 +44,7 @@ typedef struct {
     mode_t chmod;
     int uid;
     int gid;
+    int mkdirs;
     uint64_t rtime;
     int ctime;
     uint64_t rsize;
@@ -204,7 +206,7 @@ static int ecr_rf_close0(ecr_rollingfile_t *rf) {
 static int ecr_rf_maybe_open(ecr_rollingfile_t *rf, struct tm *stm, int batch) {
     int fd, i;
     FILE *file, *wrapped;
-    char *filename;
+    char *filename, *path, *dir;
     time_t t;
     struct tm stm0;
     ecr_io_wrapper_t *wrapper;
@@ -236,6 +238,15 @@ static int ecr_rf_maybe_open(ecr_rollingfile_t *rf, struct tm *stm, int batch) {
         }
     } else {
         rf->vars.batch = 0;
+    }
+
+    if (rf->mkdirs) {
+        path = strdup(filename);
+        dir = dirname(path);
+        if (dir && ecr_mkdirs(dir, rf->chmod)) {
+            L_ERROR("error mkdir %s: %s", dir, strerror(errno));
+        }
+        free(path);
     }
 
     file = fopen(filename, rf->mode);
@@ -427,6 +438,7 @@ FILE * ecr_rollingfile_open(const char *filestr, int id, ecr_io_reg_t *regs) {
             { "rtime", &rf->rtime, ECR_CFG_INT }, //
             { "ctime", &rf->ctime, ECR_CFG_INT }, //
             { "rsize", &rf->rsize, ECR_CFG_UINT64 }, //
+            { "mkdir", &rf->mkdirs, ECR_CFG_INT }, //
             { "tmp", &rf->tmp, ECR_CFG_STRING }, //
             { 0 } };
 
