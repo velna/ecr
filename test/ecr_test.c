@@ -145,8 +145,8 @@ void ecr_test_buf(int n) {
 
 void test_bwlist(const char *bwlist_file) {
     ecr_bwl_t bwlist;
-    ecr_bwl_opt_t bwopt;
-    int id, i;
+    ecr_bwl_opt_t bwopt = { 0 };
+    int id = 0, i;
     ecr_fixedhash_ctx_t ctx;
     ecr_fixedhash_t *hash;
     char mem[4096];

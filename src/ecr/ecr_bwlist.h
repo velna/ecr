@@ -108,6 +108,8 @@ typedef struct ecr_bwl_source_data_s {
 } ecr_bwl_source_data_t;
 
 typedef struct {
+    int next_sid;
+    ecr_list_t source_list;
     ecr_bwl_t *bwl;
     ecr_bwl_group_t *groups;
     int next_expr_id;
@@ -116,15 +118,16 @@ typedef struct {
 } ecr_bwl_data_t;
 
 struct ecr_bwl_s {
-    ecr_list_t source_list;
+    unsigned int version;
+    pthread_mutex_t lock;
     ecr_bwl_opt_t opts;
-    int next_sid;
-
     ecr_bwl_data_t *data;
     ecr_bwl_data_t *tmp_data;
+    ecr_bwl_data_t *next_data;
 };
 
 typedef struct {
+    unsigned int version;
     void **users;
     size_t users_size;
     ecr_str_t sources;
@@ -137,9 +140,12 @@ int ecr_bwl_init(ecr_bwl_t *list, ecr_bwl_opt_t *opt);
 void ecr_bwl_destroy(ecr_bwl_t *list);
 
 /**
- * return -1 for error, 0 for ok, and id_out will be the id of the bwlist if id_out is not null
+ * return -1 for error, 0 for ok, and id_out will be the id of the bwlist if id_out is not null.
+ * if *id_out > 0, the new source will replace the old one which id is *id_out, and id_out is left un-modified.
  */
 int ecr_bwl_add(ecr_bwl_t *list, const char *source, ecr_bwl_logic_t logic, void *user, int *id_out);
+
+int ecr_bwl_remove(ecr_bwl_t *list, int id);
 
 int ecr_bwl_compile(ecr_bwl_t *list);
 
@@ -147,7 +153,7 @@ int ecr_bwl_reload(ecr_bwl_t *list);
 
 int ecr_bwl_check(ecr_bwl_t *list);
 
-#define ecr_bwl_result_memsize(list) (sizeof(ecr_bwl_result_t) + ((list)->data->next_expr_id + (list)->next_sid) * (1 + sizeof(void*)))
+#define ecr_bwl_result_memsize(list) (sizeof(ecr_bwl_result_t) + ((list)->data->next_expr_id + (list)->data->next_sid) * (1 + sizeof(void*)))
 
 ecr_bwl_result_t * ecr_bwl_result_init_mem(ecr_bwl_t *list, void *mem);
 

@@ -277,11 +277,14 @@ void ecr_pub_destroy(ecr_pub_t *pub) {
         }
         switch (output->type) {
         case ECR_PUB_STAT:
-            // do nothing
+            ecr_counter_delete(pub->config.cctx, pub->id, "stat_ok");
+            ecr_counter_delete(pub->config.cctx, pub->id, "stat_bytes");
             break;
         case ECR_PUB_ZMQ:
             zmq_close(output->zmq.skt);
             pthread_mutex_destroy(&output->zmq.lock);
+            ecr_counter_delete(pub->config.cctx, pub->id, "zmq_ok");
+            ecr_counter_delete(pub->config.cctx, pub->id, "zmq_bytes");
             break;
         case ECR_PUB_FILE:
             for (i = 0; i < pub->config.num_threads; i++) {
@@ -293,6 +296,8 @@ void ecr_pub_destroy(ecr_pub_t *pub) {
             }
             free(output->file.array);
             free(output->file.idx_array);
+            ecr_counter_delete(pub->config.cctx, pub->id, "file_ok");
+            ecr_counter_delete(pub->config.cctx, pub->id, "file_bytes");
             break;
         case ECR_PUB_KAFKA:
             rd_kafka_poll(output->kafka.kafka, 0);
@@ -301,6 +306,8 @@ void ecr_pub_destroy(ecr_pub_t *pub) {
                 rd_kafka_destroy(output->kafka.kafka);
                 rd_kafka_wait_destroyed(1000);
             }
+            ecr_counter_delete(pub->config.cctx, pub->id, "kafka_ok");
+            ecr_counter_delete(pub->config.cctx, pub->id, "kafka_bytes");
             break;
         }
         free_to_null(output->format);

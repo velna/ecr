@@ -54,6 +54,15 @@ static void ecr_bwl_free_user_handler(ecr_hashmap_t *map, void *key, size_t key_
     free(value);
 }
 
+static void ecr_bwl_source_free(ecr_bwl_source_t *bwsource) {
+    free_to_null(bwsource->source);
+    free(bwsource);
+}
+
+static void ecr_bwl_free_source_handler(ecr_list_t *l, int i, void *value) {
+    ecr_bwl_source_free(value);
+}
+
 /**
  * return -1 for error, else return 0
  */
@@ -482,6 +491,38 @@ static void ecr_bwl_expr_dump(ecr_bwl_expr_t *expr, FILE *stream) {
     }
 }
 
+static ecr_bwl_source_data_t * ecr_bwl_source_data_init(ecr_bwl_source_t *bwsource) {
+    ecr_bwl_source_data_t *source_data = calloc(1, sizeof(ecr_bwl_source_data_t));
+    source_data->id = bwsource->id;
+    source_data->user = bwsource->user;
+    source_data->source = bwsource;
+    ecr_hashmap_init(&source_data->expr_map, 16, 0);
+    ecr_hashmap_init(&source_data->item_groups, 16, 0);
+    return source_data;
+}
+
+static void ecr_bwl_source_data_destroy(ecr_bwl_source_data_t *source_data) {
+    ecr_bwl_expr_destroy(source_data->expr);
+    ecr_hashmap_destroy(&source_data->item_groups, ecr_bwl_free_group_item_handler);
+    ecr_hashmap_destroy(&source_data->expr_map, ecr_hashmap_free_value_handler);
+    if (source_data->id != source_data->source->id) {
+        free_to_null(source_data->user);
+    }
+    free(source_data);
+}
+
+static int ecr_bwl_source_data_add(ecr_bwl_source_data_t *source_data, ecr_bwl_data_t *data) {
+    if (ecr_bwl_expr_parse(data, source_data)) {
+        return -1;
+    }
+    ecr_hashmap_clear(&source_data->item_groups, ecr_bwl_free_group_item_handler);
+    ecr_hashmap_clear(&source_data->expr_map, ecr_hashmap_free_value_handler);
+
+    source_data->next = data->source_data;
+    data->source_data = source_data;
+    return 0;
+}
+
 static int ecr_bwl_load_item_from_file(ecr_bwl_data_t *data, ecr_list_t *group_items, const char *file, int crypt) {
     char *line, *value, *file_name;
     size_t len;
@@ -525,38 +566,6 @@ static int ecr_bwl_load_item_from_file(ecr_bwl_data_t *data, ecr_list_t *group_i
     free(line);
     fclose(fd);
     return rc;
-}
-
-static ecr_bwl_source_data_t * ecr_bwl_source_data_init(ecr_bwl_source_t *bwsource) {
-    ecr_bwl_source_data_t *source_data = calloc(1, sizeof(ecr_bwl_source_data_t));
-    source_data->id = bwsource->id;
-    source_data->user = bwsource->user;
-    source_data->source = bwsource;
-    ecr_hashmap_init(&source_data->expr_map, 16, 0);
-    ecr_hashmap_init(&source_data->item_groups, 16, 0);
-    return source_data;
-}
-
-static void ecr_bwl_source_data_destroy(ecr_bwl_source_data_t *source_data) {
-    ecr_bwl_expr_destroy(source_data->expr);
-    ecr_hashmap_destroy(&source_data->item_groups, ecr_bwl_free_group_item_handler);
-    ecr_hashmap_destroy(&source_data->expr_map, ecr_hashmap_free_value_handler);
-    if (source_data->id != source_data->source->id) {
-        free_to_null(source_data->user);
-    }
-    free(source_data);
-}
-
-static int ecr_bwl_source_data_add(ecr_bwl_source_data_t *source_data, ecr_bwl_data_t *data) {
-    if (ecr_bwl_expr_parse(data, source_data)) {
-        return -1;
-    }
-    ecr_hashmap_clear(&source_data->item_groups, ecr_bwl_free_group_item_handler);
-    ecr_hashmap_clear(&source_data->expr_map, ecr_hashmap_free_value_handler);
-
-    source_data->next = data->source_data;
-    data->source_data = source_data;
-    return 0;
 }
 
 static int ecr_bwl_load_stream(ecr_bwl_data_t *data, FILE *stream, ecr_bwl_source_t *source, int crypt) {
@@ -804,7 +813,7 @@ static int ecr_bwl_load_mongo(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, 
             if (tag) {
                 source_data_tmp = source_data;
                 source_data = ecr_bwl_source_data_init(bwsource);
-                source_data->id = data->bwl->next_sid++;
+                source_data->id = data->next_sid++;
                 source_data->user = strdup(tag);
             }
             if (ecr_bwl_make_expr(data, source_data, field, match_type, &bwtype, &group_items)) {
@@ -877,9 +886,24 @@ static int ecr_bwl_load_mongo(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, 
 static ecr_bwl_data_t * ecr_bwl_data_new(ecr_bwl_t *list) {
     ecr_bwl_data_t *data = calloc(1, sizeof(ecr_bwl_data_t));
     data->bwl = list;
+    data->next_sid = 1;
     data->next_expr_id = 1;
+    ecr_list_init(&data->source_list, 16);
     ecr_hashmap_init(&data->user_map, 16, 0);
     return data;
+}
+
+static void ecr_bwl_data_copy(ecr_bwl_data_t *src, ecr_bwl_data_t *dst) {
+    int i;
+    ecr_bwl_source_t *bwsource;
+
+    dst->next_sid = src->next_sid;
+    for (i = 0; i < ecr_list_size(&src->source_list); i++) {
+        bwsource = malloc(sizeof(ecr_bwl_source_t));
+        *bwsource = *(ecr_bwl_source_t*) ecr_list_get(&src->source_list, i);
+        bwsource->source = strdup(bwsource->source);
+        ecr_list_add(&dst->source_list, bwsource);
+    }
 }
 
 static void ecr_bwl_data_clear(ecr_bwl_data_t *data) {
@@ -918,30 +942,32 @@ static void ecr_bwl_data_clear(ecr_bwl_data_t *data) {
     data->source_data = NULL;
 
     ecr_hashmap_clear(&data->user_map, ecr_bwl_free_user_handler);
+    ecr_list_clear(&data->source_list, ecr_bwl_free_source_handler);
     data->next_expr_id = 1;
-
+    data->next_sid = 1;
 }
 
 static void ecr_bwl_data_destroy(ecr_bwl_data_t *data) {
     if (data) {
         ecr_bwl_data_clear(data);
+        ecr_list_destroy(&data->source_list, ecr_bwl_free_source_handler);
         ecr_hashmap_destroy(&data->user_map, ecr_bwl_free_user_handler);
+        free_to_null(data);
     }
 }
 
-static int ecr_bwl_reload0(ecr_bwl_t *list, int force) {
+/**
+ * return 0 for ok, -2 for un-modified, -1 for error
+ */
+static int ecr_bwl_compile_0(ecr_bwl_data_t *data, int force) {
     ecr_bwl_source_t *bwsource;
     ecr_bwl_group_t *group;
-    int rc, n = 0, modified = 0, i;
+    int rc, modified = 0, i;
     ecr_list_t unmodified_sources;
-    ecr_bwl_data_t *data;
 
-    n = 0;
     ecr_list_init(&unmodified_sources, 16);
-    data = list->tmp_data;
-    ecr_bwl_data_clear(data);
-    for (i = 0; i < ecr_list_size(&list->source_list); i++) {
-        bwsource = ecr_list_get(&list->source_list, i);
+    for (i = 0; i < ecr_list_size(&data->source_list); i++) {
+        bwsource = ecr_list_get(&data->source_list, i);
         switch (bwsource->source_type) {
         case BWL_FILE:
             rc = ecr_bwl_load_file(data, bwsource, force, 0);
@@ -966,7 +992,6 @@ static int ecr_bwl_reload0(ecr_bwl_t *list, int force) {
             return -1;
         } else if (rc >= 0) {
             modified = 1;
-            n += rc;
         } else if (rc == -2) {
             ecr_list_add(&unmodified_sources, bwsource);
         }
@@ -996,7 +1021,6 @@ static int ecr_bwl_reload0(ecr_bwl_t *list, int force) {
             ecr_list_destroy(&unmodified_sources, NULL);
             return -1;
         }
-        n += rc;
     }
     ecr_list_destroy(&unmodified_sources, NULL);
 
@@ -1007,12 +1031,216 @@ static int ecr_bwl_reload0(ecr_bwl_t *list, int force) {
         }
         group = group->next;
     }
-
-    data = list->data;
-    list->data = list->tmp_data;
-    list->tmp_data = data;
-
     return 0;
+}
+
+int ecr_bwl_compile(ecr_bwl_t *list) {
+    int rc;
+    ecr_bwl_data_t *data;
+    pthread_mutex_lock(&list->lock);
+    rc = ecr_bwl_compile_0(list->next_data, 1);
+    if (rc == 0) {
+        data = list->data;
+        list->data = list->next_data;
+        list->next_data = list->tmp_data;
+        list->tmp_data = data;
+        list->version++;
+    }
+    pthread_mutex_unlock(&list->lock);
+    return rc;
+}
+
+int ecr_bwl_reload_0(ecr_bwl_t *list, int force) {
+    ecr_bwl_data_t *data;
+    int rc;
+    if (force) {
+        pthread_mutex_lock(&list->lock);
+    } else {
+        if (pthread_mutex_trylock(&list->lock)) {
+            return -1;
+        }
+    }
+    ecr_bwl_data_clear(list->tmp_data);
+    ecr_bwl_data_clear(list->next_data); // free memory
+    ecr_bwl_data_copy(list->data, list->tmp_data);
+    rc = ecr_bwl_compile_0(list->tmp_data, force);
+    if (rc == 0) {
+        data = list->data;
+        list->data = list->tmp_data;
+        list->tmp_data = data;
+        list->version++;
+    }
+    pthread_mutex_unlock(&list->lock);
+    return rc;
+}
+
+int ecr_bwl_reload(ecr_bwl_t *list) {
+    return ecr_bwl_reload_0(list, 1);
+}
+
+int ecr_bwl_check(ecr_bwl_t *list) {
+    return ecr_bwl_reload_0(list, 0);
+}
+
+int ecr_bwl_init(ecr_bwl_t *list, ecr_bwl_opt_t *opt) {
+    memset(list, 0, sizeof(ecr_bwl_t));
+
+    if (opt) {
+        if (opt->basepath) {
+            list->opts.basepath = strdup(opt->basepath);
+        }
+        if (opt->mongo_pool) {
+            list->opts.mongo_pool = opt->mongo_pool;
+        }
+        if (opt->fixedhash_ctx) {
+            list->opts.fixedhash_ctx = opt->fixedhash_ctx;
+        }
+        if (opt->log_handler) {
+            list->opts.log_handler = opt->log_handler;
+        }
+        if (opt->cfile_pwd) {
+            list->opts.cfile_pwd = strdup(opt->cfile_pwd);
+        }
+    }
+
+    pthread_mutex_init(&list->lock, NULL);
+    list->data = ecr_bwl_data_new(list);
+    list->tmp_data = ecr_bwl_data_new(list);
+    list->next_data = ecr_bwl_data_new(list);
+    return 0;
+}
+
+void ecr_bwl_destroy(ecr_bwl_t *list) {
+    ecr_bwl_data_destroy(list->data);
+    ecr_bwl_data_destroy(list->tmp_data);
+    ecr_bwl_data_destroy(list->next_data);
+    free_to_null(list->opts.basepath);
+    free_to_null(list->opts.cfile_pwd);
+    pthread_mutex_destroy(&list->lock);
+}
+
+static int ecr_bwl_remove_0(ecr_bwl_data_t *data, int id) {
+    int i, rc = -1;
+    ecr_bwl_source_t *source;
+    for (i = 0; i < ecr_list_size(&data->source_list); i++) {
+        source = ecr_list_get(&data->source_list, i);
+        if (source->id == id) {
+            ecr_list_remove_at(&data->source_list, i);
+            ecr_bwl_source_free(source);
+            rc = 0;
+            break;
+        }
+    }
+    return rc;
+}
+
+int ecr_bwl_add(ecr_bwl_t *list, const char *source, ecr_bwl_logic_t logic, void *user, int *id_out) {
+    ecr_bwl_source_t *bwsource;
+    ecr_bwl_data_t *data;
+
+    if (logic != BWL_AND && logic != BWL_OR) {
+        ecr_bwl_log(list, LOG_ERR, "invalid logic: %d", logic);
+        return -1;
+    }
+
+    bwsource = calloc(1, sizeof(ecr_bwl_source_t));
+    bwsource->logic = logic;
+    bwsource->user = user;
+
+    if (strncmp(source, ECR_BWL_SOURCE_FILE, strlen(ECR_BWL_SOURCE_FILE)) == 0) {
+        bwsource->source_type = BWL_FILE;
+        bwsource->source = strdup(source + strlen(ECR_BWL_SOURCE_FILE));
+    } else if (strncmp(source, ECR_BWL_SOURCE_CFILE, strlen(ECR_BWL_SOURCE_CFILE)) == 0) {
+        bwsource->source_type = BWL_CFILE;
+        bwsource->source = strdup(source + strlen(ECR_BWL_SOURCE_CFILE));
+    } else if (strncmp(source, ECR_BWL_SOURCE_MONGODB, strlen(ECR_BWL_SOURCE_MONGODB)) == 0) {
+        bwsource->source_type = BWL_MONGO;
+        bwsource->source = strdup(source + strlen(ECR_BWL_SOURCE_MONGODB));
+    } else if (strncmp(source, ECR_BWL_SOURCE_STRING, strlen(ECR_BWL_SOURCE_STRING)) == 0) {
+        bwsource->source_type = BWL_STRING;
+        bwsource->source = strdup(source + strlen(ECR_BWL_SOURCE_STRING));
+    } else {
+        ecr_bwl_log(list, LOG_ERR, "invalid source: %s", source);
+        free(bwsource);
+        return -1;
+    }
+
+    pthread_mutex_lock(&list->lock);
+    data = list->next_data;
+    if (data->next_sid == 1) {
+        ecr_bwl_data_copy(list->data, data);
+    }
+    if (id_out && *id_out) {
+        bwsource->id = *id_out;
+        ecr_bwl_remove_0(data, *id_out);
+    } else {
+        bwsource->id = data->next_sid++;
+        if (id_out) {
+            *id_out = bwsource->id;
+        }
+    }
+    ecr_list_add(&data->source_list, bwsource);
+    pthread_mutex_unlock(&list->lock);
+    return 0;
+}
+
+int ecr_bwl_remove(ecr_bwl_t *list, int id) {
+    int rc = -1;
+    ecr_bwl_data_t *data;
+
+    pthread_mutex_lock(&list->lock);
+    data = list->next_data;
+    if (data->next_sid == 1) {
+        ecr_bwl_data_copy(list->data, data);
+    }
+    ecr_bwl_remove_0(data, id);
+    pthread_mutex_unlock(&list->lock);
+    return rc;
+}
+
+ecr_bwl_result_t * ecr_bwl_result_init_mem(ecr_bwl_t *list, void *mem) {
+    ecr_bwl_result_t *ret;
+    char *chmem = mem;
+
+    ret = mem;
+    chmem += sizeof(ecr_bwl_result_t);
+    ret->exprs.ptr = chmem;
+    chmem += (ret->exprs.len = list->data->next_expr_id);
+    ret->sources.ptr = chmem;
+    chmem += (ret->users_size = ret->sources.len = list->data->next_sid);
+    ret->users = (void**) chmem;
+    chmem += ret->users_size * sizeof(void*);
+    ret->expr_items = (ecr_str_t**) chmem;
+    ret->version = list->version;
+
+    return ret;
+}
+
+ecr_bwl_result_t * ecr_bwl_result_init(ecr_bwl_t *list) {
+    ecr_bwl_result_t *ret = calloc(1, sizeof(ecr_bwl_result_t));
+    ret->exprs.len = list->data->next_expr_id;
+    ret->exprs.ptr = calloc(1, ret->exprs.len);
+    ret->users_size = ret->sources.len = list->data->next_sid;
+    ret->sources.ptr = calloc(1, ret->sources.len);
+    ret->users = calloc(ret->users_size, sizeof(void*));
+    ret->expr_items = calloc(ret->exprs.len, sizeof(ecr_str_t*));
+    ret->version = list->version;
+    return ret;
+}
+
+void ecr_bwl_result_clear(ecr_bwl_result_t *result) {
+    memset(result->sources.ptr, 0, result->sources.len);
+    memset(result->exprs.ptr, 0, result->exprs.len);
+    memset(result->users, 0, result->users_size * sizeof(void*));
+    memset(result->expr_items, 0, result->exprs.len * sizeof(ecr_str_t*));
+}
+
+void ecr_bwl_result_destroy(ecr_bwl_result_t *result) {
+    free(result->users);
+    free(result->sources.ptr);
+    free(result->exprs.ptr);
+    free(result->expr_items);
+    free(result);
 }
 
 static inline void ecr_bwl_add_matched(ecr_bwl_result_t *result, ecr_list_t *users, ecr_str_t *item) {
@@ -1063,143 +1291,6 @@ static void ecr_bwl_match_one(ecr_bwl_group_t *group, ecr_str_t *hdr, ecr_bwl_re
     }
 }
 
-static void ecr_bwl_free_source_handler(ecr_list_t *l, int i, void *value) {
-    ecr_bwl_source_t *bwsource = value;
-    free_to_null(bwsource->source);
-    free(bwsource);
-}
-
-int ecr_bwl_init(ecr_bwl_t *list, ecr_bwl_opt_t *opt) {
-    memset(list, 0, sizeof(ecr_bwl_t));
-    ecr_list_init(&list->source_list, 16);
-
-    if (opt) {
-        if (opt->basepath) {
-            list->opts.basepath = strdup(opt->basepath);
-        }
-        if (opt->mongo_pool) {
-            list->opts.mongo_pool = opt->mongo_pool;
-        }
-        if (opt->fixedhash_ctx) {
-            list->opts.fixedhash_ctx = opt->fixedhash_ctx;
-        }
-        if (opt->log_handler) {
-            list->opts.log_handler = opt->log_handler;
-        }
-        if (opt->cfile_pwd) {
-            list->opts.cfile_pwd = strdup(opt->cfile_pwd);
-        }
-    }
-
-    list->next_sid = 1;
-    list->data = ecr_bwl_data_new(list);
-    list->tmp_data = ecr_bwl_data_new(list);
-    return 0;
-}
-
-void ecr_bwl_destroy(ecr_bwl_t *list) {
-    ecr_bwl_data_destroy(list->data);
-    ecr_bwl_data_destroy(list->tmp_data);
-    free_to_null(list->data);
-    free_to_null(list->tmp_data);
-    free_to_null(list->opts.basepath);
-    free_to_null(list->opts.cfile_pwd);
-    ecr_list_destroy(&list->source_list, ecr_bwl_free_source_handler);
-}
-
-int ecr_bwl_add(ecr_bwl_t *list, const char *source, ecr_bwl_logic_t logic, void *user, int *id_out) {
-    ecr_bwl_source_t *bwsource;
-
-    if (logic != BWL_AND && logic != BWL_OR) {
-        ecr_bwl_log(list, LOG_ERR, "invalid logic: %d", logic);
-        return -1;
-    }
-
-    bwsource = calloc(1, sizeof(ecr_bwl_source_t));
-    bwsource->logic = logic;
-    bwsource->id = list->next_sid++;
-    bwsource->user = user;
-
-    if (strncmp(source, ECR_BWL_SOURCE_FILE, strlen(ECR_BWL_SOURCE_FILE)) == 0) {
-        bwsource->source_type = BWL_FILE;
-        bwsource->source = strdup(source + strlen(ECR_BWL_SOURCE_FILE));
-    } else if (strncmp(source, ECR_BWL_SOURCE_CFILE, strlen(ECR_BWL_SOURCE_CFILE)) == 0) {
-        bwsource->source_type = BWL_CFILE;
-        bwsource->source = strdup(source + strlen(ECR_BWL_SOURCE_CFILE));
-    } else if (strncmp(source, ECR_BWL_SOURCE_MONGODB, strlen(ECR_BWL_SOURCE_MONGODB)) == 0) {
-        bwsource->source_type = BWL_MONGO;
-        bwsource->source = strdup(source + strlen(ECR_BWL_SOURCE_MONGODB));
-    } else if (strncmp(source, ECR_BWL_SOURCE_STRING, strlen(ECR_BWL_SOURCE_STRING)) == 0) {
-        bwsource->source_type = BWL_STRING;
-        bwsource->source = strdup(source + strlen(ECR_BWL_SOURCE_STRING));
-    } else {
-        ecr_bwl_log(list, LOG_ERR, "invalid source: %s", source);
-        free(bwsource);
-        return -1;
-    }
-
-    ecr_list_add(&list->source_list, bwsource);
-    if (id_out) {
-        *id_out = bwsource->id;
-    }
-    return 0;
-}
-
-int ecr_bwl_compile(ecr_bwl_t *list) {
-    return ecr_bwl_reload0(list, 1);
-}
-
-int ecr_bwl_reload(ecr_bwl_t *list) {
-    return ecr_bwl_reload0(list, 1);
-}
-
-int ecr_bwl_check(ecr_bwl_t *list) {
-    return ecr_bwl_reload0(list, 0);
-}
-
-ecr_bwl_result_t * ecr_bwl_result_init_mem(ecr_bwl_t *list, void *mem) {
-    ecr_bwl_result_t *ret;
-    char *chmem = mem;
-
-    ret = mem;
-    chmem += sizeof(ecr_bwl_result_t);
-    ret->exprs.ptr = chmem;
-    chmem += (ret->exprs.len = list->data->next_expr_id);
-    ret->sources.ptr = chmem;
-    chmem += (ret->users_size = ret->sources.len = list->next_sid);
-    ret->users = (void**) chmem;
-    chmem += ret->users_size * sizeof(void*);
-    ret->expr_items = (ecr_str_t**) chmem;
-
-    return ret;
-}
-
-ecr_bwl_result_t * ecr_bwl_result_init(ecr_bwl_t *list) {
-    ecr_bwl_result_t *ret = calloc(1, sizeof(ecr_bwl_result_t));
-    ret->exprs.len = list->data->next_expr_id;
-    ret->exprs.ptr = calloc(1, ret->exprs.len);
-    ret->users_size = ret->sources.len = list->next_sid;
-    ret->sources.ptr = calloc(1, ret->sources.len);
-    ret->users = calloc(ret->users_size, sizeof(void*));
-    ret->expr_items = calloc(ret->exprs.len, sizeof(ecr_str_t*));
-    return ret;
-}
-
-void ecr_bwl_result_clear(ecr_bwl_result_t *result) {
-    memset(result->sources.ptr, 0, result->sources.len);
-    memset(result->exprs.ptr, 0, result->exprs.len);
-    memset(result->users, 0, result->users_size * sizeof(void*));
-    memset(result->expr_items, 0, result->exprs.len * sizeof(ecr_str_t*));
-}
-
-void ecr_bwl_result_destroy(ecr_bwl_result_t *result) {
-    free(result->users);
-    free(result->sources.ptr);
-    free(result->exprs.ptr);
-    free(result->expr_items);
-    free(result);
-}
-
 int ecr_bwl_matches_fixed(ecr_bwl_t *list, ecr_fixedhash_t *hash, ecr_bwl_result_t *result) {
     ecr_bwl_group_t *group;
     ecr_str_t *hdr;
@@ -1214,7 +1305,7 @@ int ecr_bwl_matches_fixed(ecr_bwl_t *list, ecr_fixedhash_t *hash, ecr_bwl_result
 
     data = list->data;
 
-    if (result->sources.len < list->next_sid || result->exprs.len < data->next_expr_id) {
+    if (result->version != list->version) {
         return -1;
     }
 

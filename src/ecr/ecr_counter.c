@@ -14,6 +14,12 @@
 
 #define DEFAULT_GROUP   "default"
 
+static void ecr_counter_destroy(ecr_counter_t *ctr) {
+    free_to_null(ctr->name);
+    free_to_null(ctr->group);
+    free_to_null(ctr);
+}
+
 int ecr_counter_ctx_init(ecr_counter_ctx_t *ctx) {
     memset(ctx, 0, sizeof(ecr_counter_ctx_t));
     ecr_list_init(&ctx->counters, 16);
@@ -35,6 +41,29 @@ ecr_counter_t * ecr_counter_create(ecr_counter_ctx_t *ctx, const char *group, co
     ecr_list_add(&ctx->counters, ctr);
     ecr_hashmap_put(&ctx->countermap, ctr->name, strlen(ctr->name), ctr);
     return ctr;
+}
+
+int ecr_counter_delete(ecr_counter_ctx_t *ctx, const char *group, const char *name) {
+    char *ctr_name, *ctr_group;
+    ecr_counter_t *ctr;
+    int rc;
+    if (group) {
+        asprintf(&ctr_name, "%s.%s", group, name);
+        ctr_group = strdup(group);
+    } else {
+        ctr_name = strdup(name);
+        ctr_group = strdup(DEFAULT_GROUP);
+    }
+    if ((ctr = ecr_hashmap_remove(&ctx->countermap, ctr_name, strlen(ctr_name)))) {
+        ecr_list_remove(&ctx->counters, ctr);
+        ecr_counter_destroy(ctr);
+        rc = 0;
+    } else {
+        rc = -1;
+    }
+    free(ctr_name);
+    free(ctr_group);
+    return rc;
 }
 
 void ecr_counter_setopt(ecr_counter_t *counter, int opt) {
@@ -169,10 +198,7 @@ int ecr_counter_print(ecr_counter_ctx_t *ctx, FILE *stream) {
 }
 
 static void ecr_destroy_handler(ecr_list_t *l, int i, void *value) {
-    ecr_counter_t *ctr = value;
-    free_to_null(ctr->name);
-    free_to_null(ctr->group);
-    free_to_null(ctr);
+    ecr_counter_destroy(value);
 }
 
 void ecr_counter_ctx_destroy(ecr_counter_ctx_t *ctx) {

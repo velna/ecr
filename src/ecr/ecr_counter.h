@@ -38,6 +38,8 @@ int ecr_counter_ctx_init(ecr_counter_ctx_t *ctx);
 
 ecr_counter_t* ecr_counter_create(ecr_counter_ctx_t *ctx, const char *group, const char *name, int opt);
 
+int ecr_counter_delete(ecr_counter_ctx_t *ctx, const char *group, const char *name);
+
 void ecr_counter_setopt(ecr_counter_t *counter, int opt);
 
 ecr_counter_t* ecr_counter_get(ecr_counter_ctx_t *ctx, const char *group, const char *name);
