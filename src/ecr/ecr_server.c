@@ -19,7 +19,20 @@ void ecr_server_close_cb(uv_handle_t *handle) {
 }
 
 static void ecr_server_close_walk_cb(uv_handle_t *handle, void *arg) {
-    uv_close(handle, ecr_server_close_cb);
+    ecr_server_worker_t *worker = arg;
+    if (uv_is_closing(handle)) {
+        return;
+    }
+    if (handle == (uv_handle_t*) worker->server->master_socket) {
+        uv_close(handle, ecr_server_close_cb);
+    } else {
+        if (handle->type == UV_TCP) {
+            uv_shutdown_t* sreq = malloc(sizeof(uv_shutdown_t));
+            uv_shutdown(sreq, (uv_stream_t*) handle, worker->server->config.shutdown_cb);
+        } else {
+            uv_close(handle, ecr_server_close_cb);
+        }
+    }
 }
 
 static void ecr_server_cmd_send(ecr_server_worker_t *worker, int cmd_code, void *data) {
@@ -50,7 +63,6 @@ static void ecr_server_cmd_cb(uv_async_t *handle) {
     while (cmd) {
         switch (cmd->code) {
         case CMD_CODE_SHUTDOWN:
-            uv_walk(&worker->loop, ecr_server_close_walk_cb, NULL);
             uv_stop(&worker->loop);
             break;
         default:
@@ -237,7 +249,9 @@ static void * ecr_server_worker_routine(void *user) {
             ecr_server_worker_pipe_connect_cb);
 
     uv_run(&worker->loop, UV_RUN_DEFAULT);
-
+    uv_walk(&worker->loop, ecr_server_close_walk_cb, worker);
+    while (uv_run(&worker->loop, UV_RUN_ONCE))
+        ;
     L_INFO("[%s] worker thread %d finished.", worker->server->config.name, worker->id);
     return NULL;
 }
