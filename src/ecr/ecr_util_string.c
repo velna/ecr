@@ -11,7 +11,7 @@
 #include <string.h>
 #include <ctype.h>
 
-char * ecr_str_tok(ecr_str_t *str, const char *delims, char replace, ecr_str_t *out) {
+static char * ecr_str_tok_0(ecr_str_t *str, const char *delims, char replace_ch, int replace, ecr_str_t *out) {
     int i = 0, f;
     const char *d;
     char *ret = NULL;
@@ -20,7 +20,9 @@ char * ecr_str_tok(ecr_str_t *str, const char *delims, char replace, ecr_str_t *
         f = 0;
         do {
             if (*d == str->ptr[i]) {
-                str->ptr[i] = replace;
+                if (replace) {
+                    str->ptr[i] = replace_ch;
+                }
                 f = 1;
                 break;
             } else if (!ret) {
@@ -39,6 +41,14 @@ char * ecr_str_tok(ecr_str_t *str, const char *delims, char replace, ecr_str_t *
     str->ptr += i + 1;
     str->len -= i == str->len ? i : i + 1;
     return ret;
+}
+
+char * ecr_str_tok(ecr_str_t *str, const char *delims, ecr_str_t *out) {
+    return ecr_str_tok_0(str, delims, 0, 0, out);
+}
+
+char * ecr_str_tok_replace(ecr_str_t *str, const char *delims, char replace_ch, ecr_str_t *out) {
+    return ecr_str_tok_0(str, delims, replace_ch, 1, out);
 }
 
 char *ecr_str_trim(char * s) {

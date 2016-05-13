@@ -178,7 +178,8 @@
     (str15icmp(m, c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14) &&                                                                    \
             chricmp(m[15], c15))
 
-char * ecr_str_tok(ecr_str_t *str, const char *delims, char replace, ecr_str_t *out);
+char * ecr_str_tok(ecr_str_t *str, const char *delims, ecr_str_t *out);
+char * ecr_str_tok_replace(ecr_str_t *str, const char *delims, char replace_ch, ecr_str_t *out);
 
 char *ecr_str_trim(char *s);
 

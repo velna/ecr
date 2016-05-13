@@ -12,6 +12,7 @@
 #include "ecr/ecr_getopt.h"
 #include "ecr/ecr_hashmap.h"
 #include "ecr/ecr_heap.h"
+#include "ecr/ecr_http_decoder.h"
 #include "ecr/ecr_httpparser.h"
 #include "ecr/ecr_io.h"
 #include "ecr/ecr_kafka.h"

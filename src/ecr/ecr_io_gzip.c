@@ -12,6 +12,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <zlib.h>
 
 #define GZ_NONE 0
 #define GZ_READ 7247

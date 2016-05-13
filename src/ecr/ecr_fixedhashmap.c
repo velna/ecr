@@ -48,6 +48,34 @@ int ecr_fixedhash_ctx_init_string(ecr_fixedhash_ctx_t *ctx, const char *keys) {
     return 0;
 }
 
+static void * ecr_fixedhash_create_func(ecr_hashmap_t *map, const void *key, size_t key_size, void *user) {
+    ecr_fixedhash_key_t *k = user;
+    return (void*) (++(*k));
+}
+
+int ecr_fixedhash_ctx_add_keys(ecr_fixedhash_ctx_t *ctx, const char *keys) {
+    char *k, *ss = NULL, *str;
+    ecr_fixedhash_key_t key, next_key;
+    ecr_str_t *org_key;
+
+    next_key = (ecr_fixedhash_key_t) ecr_list_size(&ctx->keys);
+    str = strdup(keys);
+    k = strtok_r(str, ", ", &ss);
+    while (k) {
+        key = (ecr_fixedhash_key_t) ecr_hashmap_get_or_create(&ctx->key_map, k, strlen(k), ecr_fixedhash_create_func,
+                &next_key);
+        if (key == next_key) {
+            org_key = malloc(sizeof(ecr_str_t));
+            org_key->ptr = strdup(k);
+            org_key->len = strlen(k);
+            ecr_list_add(&ctx->keys, org_key);
+        }
+        k = strtok_r(NULL, ", ", &ss);
+    }
+    free(str);
+    return 0;
+}
+
 static void ecr_fixedhash_free_handler(ecr_list_t *l, int i, void* value) {
     ecr_str_t *k = value;
     free_to_null(k->ptr);
@@ -113,6 +141,20 @@ ecr_fixedhash_key_t ecr_fixedhash_getkey(ecr_fixedhash_ctx_t *ctx, const void *k
     return k ? k - 1 : -1;
 }
 
+void * ecr_fixedhash_remove(ecr_fixedhash_t *map, ecr_fixedhash_key_t key) {
+    void *ret;
+    if (key >= map->capacity || key < 0) {
+        return NULL;
+    }
+    ret = map->table[key];
+    map->table[key] = NULL;
+    return ret;
+}
+
+void ecr_fixedhash_clear(ecr_fixedhash_t *map) {
+    memset(map->table, 0, map->capacity * sizeof(void*));
+}
+
 int ecr_fixedhash_iter_init(ecr_fixedhash_iter_t *iter, ecr_fixedhash_t *map) {
     iter->idx = -1;
     iter->map = map;
@@ -121,7 +163,7 @@ int ecr_fixedhash_iter_init(ecr_fixedhash_iter_t *iter, ecr_fixedhash_t *map) {
 
 void * ecr_fixedhash_iter_next(ecr_fixedhash_iter_t *iter, ecr_fixedhash_key_t *key_out, ecr_str_t *org_key_out) {
     void *ret;
-    while ((++iter->idx) < iter->map->capacity && iter->idx > 0) {
+    while ((++iter->idx) < iter->map->capacity) {
         ret = iter->map->table[iter->idx];
         if (ret) {
             if (key_out) {

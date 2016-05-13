@@ -34,6 +34,8 @@ int ecr_fixedhash_ctx_init(ecr_fixedhash_ctx_t *ctx, const ecr_str_t* keys, int 
 
 int ecr_fixedhash_ctx_init_string(ecr_fixedhash_ctx_t *ctx, const char *keys);
 
+int ecr_fixedhash_ctx_add_keys(ecr_fixedhash_ctx_t *ctx, const char *keys);
+
 size_t ecr_fixedhash_ctx_max_keys(ecr_fixedhash_ctx_t *ctx);
 
 void ecr_fixedhash_ctx_destroy(ecr_fixedhash_ctx_t *ctx);
@@ -49,6 +51,10 @@ int ecr_fixedhash_put_original(ecr_fixedhash_t *map, const void *key, size_t key
 void * ecr_fixedhash_get(ecr_fixedhash_t *map, ecr_fixedhash_key_t key);
 
 ecr_fixedhash_key_t ecr_fixedhash_getkey(ecr_fixedhash_ctx_t *ctx, const void *key, size_t key_len);
+
+void * ecr_fixedhash_remove(ecr_fixedhash_t *map, ecr_fixedhash_key_t key);
+
+void ecr_fixedhash_clear(ecr_fixedhash_t *map);
 
 int ecr_fixedhash_iter_init(ecr_fixedhash_iter_t *iter, ecr_fixedhash_t *map);
 

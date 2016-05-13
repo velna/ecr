@@ -20,38 +20,12 @@ AM_PROG_CC_C_O
 AC_DEFINE([_GNU_SOURCE], [], [use gnu source])
 AC_DEFINE([MONGO_HAVE_UNISTD], [], [mongo have unistd])
 
-AC_ARG_ENABLE([mongo],
-    [AS_HELP_STRING([--enable-mongo], [default disable])],
-    [mongo=$enableval],
-    [mongo=no])
-if test $mongo != no; then
-	AC_DEFINE([ECR_ENABLE_MONGO], [], [enable mongo])
-fi
-
 AC_ARG_ENABLE([pfring],
     [AS_HELP_STRING([--enable-pfring], [default disable])],
     [pfring=$enableval],
     [pfring=no])
 if test $pfring != no; then
 	AC_DEFINE([ECR_ENABLE_PFRING], [], [enable pfring])
-fi
-
-AC_ARG_ENABLE([kafka],
-    [AS_HELP_STRING([--enable-kafka], [default disable])],
-    [kafka=$enableval],
-    [kafka=no])
-AM_CONDITIONAL([ECR_ENABLE_KAFKA], [test x$kafka != xno])
-if test $kafka != no; then
-	AC_DEFINE([ECR_ENABLE_KAFKA], [], [enable kafka])
-fi
-
-AC_ARG_ENABLE([lzo],
-    [AS_HELP_STRING([--enable-lzo], [default disable])],
-    [lzo=$enableval],
-    [lzo=no])
-AM_CONDITIONAL([ECR_ENABLE_LZO], [test x$lzo != xno])
-if test $lzo != no; then
-	AC_DEFINE([ECR_ENABLE_LZO], [], [enable lzo])
 fi
 
 # Checks for libraries.
@@ -81,9 +55,6 @@ echo "
 ========================
 configure results:
 ------------------------
-enable_mongo:           $mongo
 enable_pfring:          $pfring
-enable_kafka:           $kafka
-enable_lzo:             $lzo
 ========================
 "

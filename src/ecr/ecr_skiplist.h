@@ -52,7 +52,7 @@ void ecr_skiplist_add(ecr_skiplist_t *sl, void *value);
 
 void * ecr_skiplist_set(ecr_skiplist_t *sl, void *value);
 
-int ecr_skiplist_remove(ecr_skiplist_t *sl, void *value);
+void * ecr_skiplist_remove(ecr_skiplist_t *sl, void *value);
 
 void * ecr_skiplist_find(ecr_skiplist_t *sl, void *value);
 

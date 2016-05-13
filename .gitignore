@@ -46,3 +46,4 @@ stamp-h1
 
 test/ecr_test
 commit_sha.h
+run_test

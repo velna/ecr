@@ -19,6 +19,7 @@ nobase_include_HEADERS = ecr.h ecrconf.h \
 	ecr/ecr_getopt.h \
 	ecr/ecr_hashmap.h \
 	ecr/ecr_heap.h \
+	ecr/ecr_http_decoder.h \
 	ecr/ecr_httpparser.h \
 	ecr/ecr_io.h \
 	ecr/ecr_kafka.h \
@@ -52,9 +53,12 @@ libecr_la_SOURCES = \
 	ecr/ecr_getopt.c \
 	ecr/ecr_hashmap.c \
 	ecr/ecr_heap.c \
+	ecr/ecr_http_decoder.c \
 	ecr/ecr_httpparser.c \
 	ecr/ecr_io_gzip.c \
+	ecr/ecr_io_lzop.c \
 	ecr/ecr_io_rollingfile.c \
+	ecr/ecr_kafka.c \
 	ecr/ecr_list.c \
 	ecr/ecr_logger.c \
 	ecr/ecr_macbind.c \
@@ -76,13 +80,6 @@ libecr_la_SOURCES = \
 	ecr/ecr_util_zmq.c \
 	ecr/ecr_wumanber.c
 
-if ECR_ENABLE_KAFKA
-libecr_la_SOURCES+=ecr/ecr_kafka.c
-endif
-
-if ECR_ENABLE_LZO
-libecr_la_SOURCES+=ecr/ecr_io_lzop.c
-endif
 
 # Linker options libTestProgram
 libecr_la_LDFLAGS = -version-info @ECR_VERSION@

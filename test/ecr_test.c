@@ -8,12 +8,14 @@
  ============================================================================
  */
 
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ecr.h>
 #include <assert.h>
 #include <errno.h>
+#include <pthread.h>
 
 void ecr_test_rollingfile() {
     static ecr_io_reg_t ecr_io_regs[] = {
@@ -232,7 +234,77 @@ void ecr_version_test() {
     printf("%s\n", ecr_commit_sha());
 }
 
+void test_http_deocder() {
+    ecr_http_message_t *message;
+    ecr_fixedhash_ctx_t hash_ctx;
+    ecr_http_decoder_t decoder;
+    ecr_fixedhash_ctx_init_string(&hash_ctx, HTTP_HASH_FIELDS);
+
+    ecr_http_decoder_init(&decoder, &hash_ctx, 16);
+
+    char *requests[] = { //
+            //
+                    "POST /abc.html HTTP/1.1\r\n"
+                            "Host: www.baidu.com\r\n"
+                            "Transfer-Encoding: chunked\r\n"
+                            "\r\n"
+                            "a\r\n"
+                            "0123456789\r\n"
+                            "14",
+                    "\r\n"
+                            "12345678901",
+                    "234567890\r\n"
+                            "0\r\n"
+                            "\r\n",
+                    NULL
+            //
+            };
+    char *req;
+    int i = 0, rc;
+    message = ecr_http_new_request(&decoder);
+    while ((req = requests[i])) {
+        rc = ecr_http_decode(message, req, strlen(req));
+        printf("rc:%d, errno: %d, chunk_left:%zd, content_legnth:%zd\n", rc, message->error_no, message->_chunk_left,
+                message->_content_length);
+        i++;
+    }
+    ecr_http_message_dump(message, stdout);
+    ecr_http_message_destroy(message);
+}
+
+#define THREAD_LOCAL_THREADS    10
+pthread_key_t thread_local_key;
+
+void * thread_local_test_thread(void *user) {
+    char *data = NULL, *s;
+    int i, c = 0;
+    u_int64_t start = ecr_current_time();
+    for (i = 0; i < 10000000; i++) {
+        asprintf(&s, "%d", i);
+        free(s);
+//        data = pthread_getspecific(thread_local_key);
+//        if (!data) {
+//            data = user;
+//            pthread_setspecific(thread_local_key, data);
+//        }
+    }
+    printf("%p: %lu, %d\n", data, ecr_current_time() - start, c);
+    return NULL;
+}
+
+void test_thread_local() {
+    int i;
+    pthread_t threads[THREAD_LOCAL_THREADS];
+    pthread_key_create(&thread_local_key, NULL);
+    for (i = 0; i < THREAD_LOCAL_THREADS; i++) {
+        pthread_create(&threads[i], NULL, thread_local_test_thread, (void*) i + 1);
+    }
+    for (i = 0; i < THREAD_LOCAL_THREADS; i++) {
+        pthread_join(threads[i], NULL);
+    }
+}
+
 int main(int argc, char **argv) {
-    test_bwlist(argv[1]);
+    test_thread_local();
     return EXIT_SUCCESS;
 }

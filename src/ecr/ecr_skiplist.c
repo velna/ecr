@@ -167,10 +167,11 @@ static void ecr_skiplist_remove0(ecr_skiplist_t *sl, ecr_skiplist_node_t *x, ecr
     sl->size--;
 }
 
-int ecr_skiplist_remove(ecr_skiplist_t *sl, void *value) {
+void * ecr_skiplist_remove(ecr_skiplist_t *sl, void *value) {
     ecr_skiplist_node_t *update[ECR_SKIPLIST_MAXLEVEL];
     register ecr_skiplist_node_t *node;
     register int i;
+    void *ret;
 
     node = sl->header;
     for (i = sl->level - 1; i >= 0; i--) {
@@ -181,11 +182,12 @@ int ecr_skiplist_remove(ecr_skiplist_t *sl, void *value) {
     }
     node = node->level[0].forward;
     if (node && sl->compare(value, node->value) == 0) {
+        ret = node->value;
         ecr_skiplist_remove0(sl, node, update);
         ecr_skiplist_free_node(node);
-        return 0;
+        return ret;
     } else {
-        return -1;
+        return NULL;
     }
 }
 
