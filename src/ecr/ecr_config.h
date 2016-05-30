@@ -77,7 +77,7 @@ int ecr_config_load(ecr_config_t *cfg, const char *group, ecr_config_line_t *lin
 
 void ecr_config_print(FILE *out, ecr_config_line_t *config_lines);
 
-int ecr_config_print_unused(ecr_config_t *cfg);
+int ecr_config_print_unused(FILE *out, ecr_config_t *cfg);
 
 void ecr_config_destroy(ecr_config_t *cfg);
 

@@ -486,7 +486,7 @@ FILE * ecr_rollingfile_open(const char *filestr, int id, ecr_io_reg_t *regs) {
     }
     rf->config = calloc(1, sizeof(ecr_config_t));
     if (ecr_config_init_str(rf->config, rf_options) || ecr_config_load(rf->config, NULL, cfg_lines)
-            || ecr_config_print_unused(rf->config)) {
+            || ecr_config_print_unused(NULL, rf->config)) {
         L_ERROR("invalid rolling file options: %s", rf_options);
         ecr_rf_close(rf);
         free(rf);

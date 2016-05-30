@@ -787,7 +787,7 @@ FILE * ecr_gzip_open(FILE *file, const char *options) {
 
     ecr_gzip_file_t *gzfile = calloc(1, sizeof(ecr_gzip_file_t));
     if (ecr_config_init_str(&gzfile->config, options) || ecr_config_load(&gzfile->config, NULL, cfg_lines)
-            || ecr_config_print_unused(&gzfile->config)) {
+            || ecr_config_print_unused(NULL, &gzfile->config)) {
         L_ERROR("invalid gzip options: %s", options);
         ecr_config_destroy(&gzfile->config);
         free(gzfile);
