@@ -77,6 +77,7 @@ int ecr_app_init(ecr_app_t *app, int argc, char **argv) {
     ecr_config_line_t app_config_lines[] = {
     //
             { "home", &app->config.home, ECR_CFG_STRING }, //
+            { "umask", &app->config.umask, ECR_CFG_INT, .dv.i = 022 }, //
             { "main_loop_interval", &app->config.main_loop_interval, ECR_CFG_INT, .dv.i = 2 }, //
             { "fork_process", &app->config.fork_process, ECR_CFG_INT, .dv.i = 0 }, //
             { "log_file", &app->config.log_file, ECR_CFG_STRING }, //
@@ -119,6 +120,7 @@ int ecr_app_init(ecr_app_t *app, int argc, char **argv) {
         L_ERROR("can not change work dir to %s.", app->config.home);
         return -1;
     }
+    umask(app->config.umask);
 
     if (app->config.fork_process) {
         app->pid = fork();

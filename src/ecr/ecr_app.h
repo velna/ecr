@@ -22,6 +22,7 @@ typedef struct ecr_app_module_s ecr_app_module_t;
 
 typedef struct {
     char *home;
+    int umask;
     int main_loop_interval;
     char *log_file;
     char *stat_log_file;
