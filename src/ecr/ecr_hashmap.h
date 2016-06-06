@@ -27,13 +27,13 @@ typedef struct {
     size_t size;
     size_t init_capacity;
     size_t capacity;
-    uint32_t seed;
     float load_factor;
+    uint32_t seed;
+    int lock :1;
+    int rehash :1;
+    int nocopykey :1;
     ecr_hash_node_t **table;
     pthread_rwlock_t rwlock;
-    char lock :1;
-    char rehash :1;
-    char nocopykey :1;
 } ecr_hashmap_t;
 
 typedef struct {

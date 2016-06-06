@@ -193,6 +193,12 @@ size_t ecr_mem_rcspn(const void *mem, size_t n, const char *stopset);
 
 void ecr_binary_dump(FILE *out, const void *bin, size_t len);
 
+void ecr_crc32_mix(const unsigned char *s, unsigned int len, void *out);
+
+inline void ecr_crc32_hash_mix(const void *s, int len, uint32_t seed, void *out);
+
+uint32_t ecr_crc32_ch(uint32_t crc_magic, char ch);
+
 void ecr_murmur_hash3_x86_32(const void *key, int len, uint32_t seed, void *out);
 
 uint64_t ecr_murmur_hash2_x64(const void *key, int len, uint32_t seed);
@@ -206,10 +212,6 @@ void ecr_hex_str(const char *binary, size_t size, char *to);
 int ecr_hexstr2byte(const char *from, size_t size, char *to);
 
 int ecr_echo_pid(pid_t pid, char *pid_file);
-
-void ecr_crc32_mix(const unsigned char *s, unsigned int len, void *out);
-
-uint32_t ecr_crc32_ch(uint32_t crc_magic, char ch);
 
 int ecr_time_diff(struct timeval *tv1, struct timeval *tv2);
 

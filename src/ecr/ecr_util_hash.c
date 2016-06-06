@@ -23,7 +23,7 @@ inline uint64_t ecr_rotl64(uint64_t x, int8_t r) {
 
 #define BIG_CONSTANT(x) (x##LLU)
 
-static unsigned int ecr_crc32_tab[] = {
+unsigned int ecr_crc32_tab[] = {
         0x00000000,
         0x77073096,
         0xee0e612c,
@@ -314,6 +314,25 @@ inline void ecr_crc32_mix(const unsigned char *s, unsigned int len, void * out) 
     register uint32_t key = 0;
     for (i = 0; i < len; i++) {
         key = ecr_crc32_tab[(key ^ s[i]) & 0xff] ^ (key >> 8);
+    }
+    /* Robert Jenkins' 32 bit Mix Function */
+    key += (key << 12);
+    key ^= (key >> 22);
+    key += (key << 4);
+    key ^= (key >> 9);
+    key += (key << 10);
+    key ^= (key >> 2);
+    key += (key << 7);
+    key ^= (key >> 12);
+    *(uint32_t*) out = key;
+}
+
+inline void ecr_crc32_hash_mix(const void *s, int len, uint32_t seed, void *out) {
+    register unsigned int i;
+    register uint32_t key = seed;
+    const uint8_t *data = s;
+    for (i = 0; i < len; i++) {
+        key = ecr_crc32_tab[(key ^ data[i]) & 0xff] ^ (key >> 8);
     }
     /* Robert Jenkins' 32 bit Mix Function */
     key += (key << 12);

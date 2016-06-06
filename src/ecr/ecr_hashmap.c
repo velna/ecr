@@ -11,10 +11,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-static inline u_int32_t ecr_x_hash(const void *s, int len, u_int32_t seed, int capacity, u_int32_t *out) {
-    ecr_crc32_mix(s, len, out);
-    //ecr_murmur_hash3_x86_32(s, len, seed, out);
-    return (*out) % capacity;
+static inline u_int32_t ecr_x_hash(ecr_hashmap_t *map, const void *key, int key_size, u_int32_t *hash_out) {
+    ecr_crc32_hash_mix(key, key_size, map->seed, hash_out);
+    return (*hash_out) % map->capacity;
 }
 
 int ecr_hashmap_init(ecr_hashmap_t *map, size_t capacity, int flag) {
@@ -76,7 +75,7 @@ void * ecr_hashmap_put(ecr_hashmap_t *map, const void *key, size_t key_size, voi
     if (map->lock) {
         pthread_rwlock_wrlock(&map->rwlock);
     }
-    bucket = ecr_x_hash(key, key_size, map->seed, map->capacity, &hash);
+    bucket = ecr_x_hash(map, key, key_size, &hash);
     node = head = map->table[bucket];
     while (node) {
         if (hash == node->hash && key_size == node->key_size && memcmp(node->key, key, key_size) == 0) {
@@ -91,11 +90,12 @@ void * ecr_hashmap_put(ecr_hashmap_t *map, const void *key, size_t key_size, voi
         }
     }
     if (!node) {
-        node = malloc(sizeof(ecr_hash_node_t));
         if (map->nocopykey) {
+            node = malloc(sizeof(ecr_hash_node_t));
             node->key = (void *) key;
         } else {
-            node->key = malloc(key_size);
+            node = malloc(sizeof(ecr_hash_node_t) + key_size);
+            node->key = ((char*) node) + sizeof(ecr_hash_node_t);
             memcpy(node->key, key, key_size);
         }
         node->key_size = key_size;
@@ -124,7 +124,7 @@ void * ecr_hashmap_get(ecr_hashmap_t *map, const void *key, size_t key_size) {
         pthread_rwlock_rdlock(&map->rwlock);
     }
     if (map->size) {
-        bucket = ecr_x_hash(key, key_size, map->seed, map->capacity, &hash);
+        bucket = ecr_x_hash(map, key, key_size, &hash);
         node = map->table[bucket];
         while (node) {
             if (hash == node->hash && key_size == node->key_size && memcmp(node->key, key, key_size) == 0) {
@@ -153,7 +153,7 @@ void * ecr_hashmap_get_or_create(ecr_hashmap_t *map, const void *key, size_t key
         pthread_rwlock_rdlock(&map->rwlock);
     }
     if (map->size) {
-        bucket = ecr_x_hash(key, key_size, map->seed, map->capacity, &hash);
+        bucket = ecr_x_hash(map, key, key_size, &hash);
         node = head = map->table[bucket];
         while (node) {
             if (hash == node->hash && key_size == node->key_size && memcmp(node->key, key, key_size) == 0) {
@@ -169,7 +169,7 @@ void * ecr_hashmap_get_or_create(ecr_hashmap_t *map, const void *key, size_t key
             pthread_rwlock_unlock(&map->rwlock);
             pthread_rwlock_wrlock(&map->rwlock);
         }
-        bucket = ecr_x_hash(key, key_size, map->seed, map->capacity, &hash);
+        bucket = ecr_x_hash(map, key, key_size, &hash);
         node = head = map->table[bucket];
         while (node) {
             if (hash == node->hash && key_size == node->key_size && memcmp(node->key, key, key_size) == 0) {
@@ -180,11 +180,12 @@ void * ecr_hashmap_get_or_create(ecr_hashmap_t *map, const void *key, size_t key
             }
         }
         if (!node) {
-            node = malloc(sizeof(ecr_hash_node_t));
             if (map->nocopykey) {
+                node = malloc(sizeof(ecr_hash_node_t));
                 node->key = (void *) key;
             } else {
-                node->key = malloc(key_size);
+                node = malloc(sizeof(ecr_hash_node_t) + key_size);
+                node->key = ((char*) node) + sizeof(ecr_hash_node_t);
                 memcpy(node->key, key, key_size);
             }
             node->key_size = key_size;
@@ -215,7 +216,7 @@ void * ecr_hashmap_remove(ecr_hashmap_t *map, const void *key, size_t key_size) 
         pthread_rwlock_wrlock(&map->rwlock);
     }
     if (map->size) {
-        bucket = ecr_x_hash(key, key_size, map->seed, map->capacity, &hash);
+        bucket = ecr_x_hash(map, key, key_size, &hash);
         node = map->table[bucket];
         while (node) {
             if (hash == node->hash && key_size == node->key_size && memcmp(node->key, key, key_size) == 0) {
@@ -272,9 +273,6 @@ void ecr_hashmap_clear_ex(ecr_hashmap_t *map, ecr_hashmap_handler_ex handler, vo
             while (NULL != node) {
                 if (NULL != handler) {
                     handler(map, node->key, node->key_size, node->value, user);
-                }
-                if (!map->nocopykey) {
-                    free(node->key);
                 }
                 tmp_node = node->next;
                 free(node);
@@ -342,9 +340,6 @@ int ecr_hashmap_iter_remove(ecr_hashmap_iter_t *i) {
             map->table[i->index] = i->cur->next;
         }
         map->size--;
-        if (!map->nocopykey) {
-            free(i->cur->key);
-        }
         free(i->cur);
         i->cur = NULL;
         rc = 0;
