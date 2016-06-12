@@ -52,6 +52,7 @@ typedef struct {
     int thread_pool_size;
     ecr_server_accept_cb accept_cb;
     ecr_server_error_cb error_cb;
+    uv_shutdown_cb shutdown_cb;
     int tcp_nodelay;
     int tcp_keepalive;
     int tcp_keepalive_timeout;
