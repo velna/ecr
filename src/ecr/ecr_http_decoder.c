@@ -244,6 +244,7 @@ static int ecr_http_get_int_header(ecr_fixedhash_t *headers, ecr_fixedhash_key_t
 static int ecr_http_check_content(ecr_http_message_t *message) {
     ecr_str_t *value, data, out;
     ecr_http_keys_t *http_keys = &message->decoder->keys;
+    int content_length;
 
     // Transfer-Encoding
     value = ecr_fixedhash_get(message->headers, http_keys->Transfer_Encoding);
@@ -261,18 +262,17 @@ static int ecr_http_check_content(ecr_http_message_t *message) {
     if (message->_transfer_encoding0 != HTTP_ENCODING_UNKNOWN) { // using Transfer_Encoding
         message->_content_length = 0;
         return DECODE_CONTENT_CHUNKED;
-    } else if ((message->_content_length = ecr_http_get_int_header(message->headers, http_keys->Content_Length, -1))
-            >= 0) { // using Content-Length
+    } else if ((content_length = ecr_http_get_int_header(message->headers, http_keys->Content_Length, -1)) >= 0) { // using Content-Length
+        message->_content_length = content_length;
         return DECODE_CONTENT_LENGTHED;
     } else {
-        if ((message->type == HTTP_RESPONSE && message->response.request_method == HTTP_HEAD)
+        if ((message->type == HTTP_RESPONSE // response
+                && (message->response.request_method == HTTP_HEAD // head
                 || message->response.status / 100 == 1 // 1xx
-                || message->response.status == 204 // 204
-                || message->response.status == 304 // 304
-                || (message->type == HTTP_RESPONSE && message->response.request_method == HTTP_CONNECT
-                        && message->response.status / 100 == 2) // 2xx response to CONNECT
-                || message->type == HTTP_REQUEST // else if is a request
-                        ) {
+                || message->response.status == 204 || message->response.status == 304
+                        || (message->response.request_method == HTTP_CONNECT && message->response.status / 100 == 2) // 2xx to CONNECT
+                )) || message->type == HTTP_REQUEST // else if is a request
+                ) {
             message->_content_length = 0;
             return DECODE_CONTENT_LENGTHED;
         }
@@ -534,7 +534,7 @@ void ecr_http_decoder_init(ecr_http_decoder_t *decoder, ecr_fixedhash_ctx_t *ctx
     decoder->keys.Reason = ecr_fixedhash_getkey(ctx, HTTP_REASON, strlen(HTTP_REASON));
     decoder->keys.Host = ecr_fixedhash_getkey(ctx, HTTP_HOST, strlen(HTTP_HOST));
     decoder->keys.Referer = ecr_fixedhash_getkey(ctx, HTTP_REFERER, strlen(HTTP_REFERER));
-    decoder->keys.User_Agent = ecr_fixedhash_getkey(ctx, HTTP_USERAGENT, strlen(HTTP_USERAGENT));
+    decoder->keys.User_Agent = ecr_fixedhash_getkey(ctx, HTTP_USER_AGENT, strlen(HTTP_USER_AGENT));
     decoder->keys.Cookie = ecr_fixedhash_getkey(ctx, HTTP_COOKIE, strlen(HTTP_COOKIE));
     decoder->keys.Accept = ecr_fixedhash_getkey(ctx, HTTP_ACCEPT, strlen(HTTP_ACCEPT));
     decoder->keys.Content_Length = ecr_fixedhash_getkey(ctx, HTTP_CONTENT_LENGTH, strlen(HTTP_CONTENT_LENGTH));
@@ -585,30 +585,22 @@ void ecr_http_message_dump(ecr_http_message_t *message, FILE *stream) {
     ecr_fixedhash_iter_t iter;
     ecr_str_t key, *value;
 
-#define WRITE_FIELD(name, str) \
-    fprintf(stream, "%s: [", name); \
-    fwrite((str).ptr, (str).len, 1, stream); \
-    fprintf(stream, "]\n");
-
-    switch (message->type) {
-    case HTTP_REQUEST:
-        WRITE_FIELD("method", message->request.method_str)
-        WRITE_FIELD("uri", message->request.uri)
-        WRITE_FIELD("version", message->version_str)
-        break;
-    case HTTP_RESPONSE:
-        WRITE_FIELD("version", message->version_str)
-        WRITE_FIELD("status", message->response.status_str)
-        WRITE_FIELD("reason", message->response.reason)
-        break;
-    default:
-        fprintf(stream, "unknown message type: %d\n", message->type);
-        break;
-    }
+    fprintf(stream, "{===\n");
+    fprintf(stream, "[decode_status: %hhd, "
+            "error_no: %hhd, "
+            "_status: %hhd, "
+            "content_length: %zd, "
+            "transfer_encoding0: %d, "
+            "transfer_encoding1: %d, "
+            "content_encoding: %d]\n", message->decode_status, message->error_no, message->_status,
+            message->_content_length, message->_transfer_encoding0, message->_transfer_encoding1,
+            message->_content_encoding);
 
     ecr_fixedhash_iter_init(&iter, message->headers);
     while ((value = ecr_fixedhash_iter_next(&iter, NULL, &key))) {
-        WRITE_FIELD(key.ptr, *value)
+        fprintf(stream, "%s: [", key.ptr);
+        fwrite(value->ptr, value->len, 1, stream);
+        fprintf(stream, "]\n");
     }
 
     chunk = message->_chunks->head;
@@ -621,7 +613,7 @@ void ecr_http_message_dump(ecr_http_message_t *message, FILE *stream) {
         ecr_binary_dump(stream, chunk->data, chunk->size);
         chunk = chunk->next;
     }
-#undef WRITE_FIELD
+    fprintf(stream, "===}\n");
 }
 
 static void ecr_http_free_chunks(ecr_http_chunks_t *chunks) {

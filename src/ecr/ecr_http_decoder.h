@@ -39,7 +39,7 @@
 #define HTTP_REASON                 "reason"
 #define HTTP_HOST                   "host"
 #define HTTP_REFERER                "referer"
-#define HTTP_USERAGENT              "user-agent"
+#define HTTP_USER_AGENT             "user-agent"
 #define HTTP_COOKIE                 "cookie"
 #define HTTP_ACCEPT                 "accept"
 #define HTTP_CONTENT_LENGTH         "content-length"
@@ -54,7 +54,7 @@
                                     HTTP_REASON "," \
                                     HTTP_HOST "," \
                                     HTTP_REFERER "," \
-                                    HTTP_USERAGENT "," \
+                                    HTTP_USER_AGENT "," \
                                     HTTP_COOKIE "," \
                                     HTTP_ACCEPT "," \
                                     HTTP_CONTENT_LENGTH "," \

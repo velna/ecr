@@ -14,7 +14,8 @@ static ecr_fixedhash_ctx_t hash_ctx;
 static ecr_http_message_t *http_message;
 
 static int init(void) {
-    ecr_fixedhash_ctx_init_string(&hash_ctx, HTTP_HASH_FIELDS);
+    ecr_fixedhash_ctx_init(&hash_ctx);
+    ecr_fixedhash_ctx_add_keys(&hash_ctx, HTTP_HASH_FIELDS);
     ecr_http_decoder_init(&http_decoder, &hash_ctx, 16);
     return 0;
 }

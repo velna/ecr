@@ -155,7 +155,8 @@ void test_bwlist(const char *bwlist_file) {
     ecr_str_t host, uri;
     ecr_bwl_result_t *result;
 
-    ecr_fixedhash_ctx_init_string(&ctx, "host,uri");
+    ecr_fixedhash_ctx_init(&ctx);
+    ecr_fixedhash_ctx_add_keys(&ctx, "host,uri");
     hash = ecr_fixedhash_init(&ctx, mem, 4096);
     host.ptr = "www.sabc.com";
     host.len = strlen(host.ptr);
@@ -238,7 +239,8 @@ void test_http_deocder() {
     ecr_http_message_t *message;
     ecr_fixedhash_ctx_t hash_ctx;
     ecr_http_decoder_t decoder;
-    ecr_fixedhash_ctx_init_string(&hash_ctx, HTTP_HASH_FIELDS);
+    ecr_fixedhash_ctx_init(&hash_ctx);
+    ecr_fixedhash_ctx_add_keys(&hash_ctx, HTTP_HASH_FIELDS);
 
     ecr_http_decoder_init(&decoder, &hash_ctx, 16);
 
