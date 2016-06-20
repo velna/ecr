@@ -227,9 +227,6 @@ void * ecr_hashmap_remove(ecr_hashmap_t *map, const void *key, size_t key_size) 
                     map->table[bucket] = node->next;
                 }
                 map->size--;
-                if (!map->nocopykey) {
-                    free(node->key);
-                }
                 free(node);
                 break;
             } else {
