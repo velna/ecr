@@ -172,6 +172,10 @@ static int ecr_rf_close0(ecr_rollingfile_t *rf) {
     ecr_io_wrapper_t *wrapper;
 
     rc = fclose(rf->source);
+    if (!rf->w_size) {
+        remove(rf->filename);
+        return rc;
+    }
     fn = strdup(rf->filename);
     if (rf->tmp) {
         rfn = strndup(rf->filename, strlen(rf->filename) - rf->tmplen);
@@ -304,9 +308,6 @@ static void * ecr_rf_check_routin(void *user) {
             if (rf->closed) {
                 ecr_list_remove_at(&ecr_rf_list, i--);
                 free(rf);
-                continue;
-            }
-            if (!rf->w_size) {
                 continue;
             }
             now = ecr_current_time();
