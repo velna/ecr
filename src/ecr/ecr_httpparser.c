@@ -42,7 +42,7 @@ int ecr_http_req_init(ecr_http_req_t *req, ecr_fixedhash_t *hash) {
 #define YEE_TYPE_FIELD  3
 
 /**
- * return -1 for error or unexpected end, return -2 for head lines end(\r\n\r\n), return >0 for ok.
+ * return -1 for error, return -2 for head lines end(\r\n\r\n), return -3 for unexpected end, return >=0 for ok.
  */
 static int ecr_get_next_token(ecr_str_t *to, char **pptr, size_t *psize, int type) {
     size_t i = 0, len = 0, size = *psize;
@@ -104,6 +104,12 @@ static int ecr_get_next_token(ecr_str_t *to, char **pptr, size_t *psize, int typ
         *pptr += i;
         *psize -= i;
         return i;
+    case 0:
+        to->ptr = p;
+        to->len = i;
+        *pptr += i;
+        *psize -= i;
+        return -3;
     default:
         return -1;
     }
@@ -224,7 +230,7 @@ int ecr_http_req_parse(ecr_http_req_t *req, char *p, size_t size, ecr_str_t *hdr
         }
         value = hdr_buf + idx;
         n = ecr_get_next_token(value, &ptr, &size, YEE_TYPE_LINE);
-        if (n <= 0) {
+        if (n <= 0 && n != -3) {
             break;
         }
         if (req->method_type == ECR_HTTP_REQ_POST) {
@@ -242,12 +248,11 @@ int ecr_http_req_parse(ecr_http_req_t *req, char *p, size_t size, ecr_str_t *hdr
         }
     }
     if (rc == 0 && req->method_type == ECR_HTTP_REQ_POST) {
-        if (size == content_length) {
-            if (size > 0) {
-                req->body.ptr = ptr;
-                req->body.len = size;
-            }
-        } else {
+        if (size > 0) {
+            req->body.ptr = ptr;
+            req->body.len = size;
+        }
+        if (size != content_length) {
             rc = 1;
         }
     }
