@@ -113,8 +113,8 @@ typedef enum {
 typedef struct ecr_http_chunk_s {
     struct ecr_http_chunk_s *prev;
     struct ecr_http_chunk_s *next;
-    size_t size;
-    char data[];
+    ecr_str_t data;
+    char _data[];
 } ecr_http_chunk_t;
 
 typedef struct {
@@ -151,7 +151,7 @@ typedef struct ecr_http_message_s {
         } response;
     };
     ecr_fixedhash_t *headers;
-    ecr_http_chunks_t content[1];
+    ecr_http_chunks_t *content;
     ecr_http_decoder_t *decoder;
     int8_t error_no;
     int8_t decode_status;
@@ -164,7 +164,6 @@ typedef struct ecr_http_message_s {
     int _buf_idx;
     ecr_http_encoding_t _transfer_encoding0;
     ecr_http_encoding_t _transfer_encoding1;
-    ecr_http_encoding_t _content_encoding;
     ecr_http_chunks_t _chunks[1];
     size_t _chunk_left;
     size_t _content_length;
@@ -185,6 +184,8 @@ ecr_http_message_type_t ecr_http_guess(char *data, size_t size);
  * return HTTP_DECODE_OK for complete, HTTP_DECODE_MORE for incomplete, HTTP_DECODE_ERR for error
  */
 int ecr_http_decode(ecr_http_message_t *message, char *data, size_t size);
+
+int ecr_http_message_make_content(ecr_http_message_t *message, ecr_str_t *content_out);
 
 void ecr_http_message_dump(ecr_http_message_t *message, FILE *stream);
 
