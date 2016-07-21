@@ -289,6 +289,7 @@ static int ecr_http_make_content(ecr_http_message_t *message, ecr_str_t *data) {
     if (message->_buf_idx >= message->_buf_size) {
         return -1;
     }
+//    printf("message: %p, _buf_idx: %d\n", message, message->_buf_idx);
     data_len = message->_content_length > data->len ? data->len : message->_content_length;
     buf = message->_buf + message->_buf_idx;
     buf->data.ptr = data->ptr;
@@ -469,7 +470,7 @@ int ecr_http_decode(ecr_http_message_t *message, char *ptr, size_t size) {
                 }
                 if (token_rc) {
                     message->decode_status = HTTP_DECODE_MORE;
-                } else {
+                } else if (buf) {
                     // increase the _buf_idx if the header is complete
                     message->_buf_idx++;
                 }
@@ -556,13 +557,15 @@ static ecr_http_message_t * ecr_http_message_new(ecr_http_decoder_t *decoder) {
 
     hash_size = ecr_fixedhash_sizeof(decoder->hash_ctx);
     hdr_buf_size = ecr_fixedhash_ctx_max_keys(decoder->hash_ctx) + decoder->max_content_chunks;
-    hash_offset = sizeof(ecr_http_message_t) + hdr_buf_size * sizeof(ecr_str_t);
+    hash_offset = sizeof(ecr_http_message_t) + hdr_buf_size * sizeof(ecr_http_buf_t);
     message = calloc(1, hash_offset + hash_size);
     message->headers = ecr_fixedhash_init(decoder->hash_ctx, ((char *) message) + hash_offset, hash_size);
     message->_buf_size = hdr_buf_size;
     message->decoder = decoder;
     message->decode_status = HTTP_DECODE_INIT;
     message->_status = DECODE_INIT;
+//    printf("message: %p, _buf_size: %d, hash_offset: %Zd, hash_size: %Zd\n", message, message->_buf_size, hash_offset,
+//            hash_size);
     return message;
 }
 
