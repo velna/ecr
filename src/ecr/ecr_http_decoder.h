@@ -103,7 +103,7 @@ typedef enum {
  * for both Transfer-Encoding and Content-Encoding
  */
 typedef enum {
-    HTTP_ENCODING_UNKNOWN = 1, HTTP_CHUNKED, HTTP_GZIP, HTTP_COMPRESS, HTTP_DEFLATE, HTTP_IDENTITY
+    HTTP_ENCODING_NULL = 0, HTTP_ENCODING_UNKNOWN, HTTP_CHUNKED, HTTP_GZIP, HTTP_COMPRESS, HTTP_DEFLATE, HTTP_IDENTITY
 } ecr_http_encoding_t;
 
 typedef enum {
@@ -162,8 +162,8 @@ typedef struct ecr_http_message_s {
     int _content_buf_idx;
     int _buf_size;
     int _buf_idx;
-    ecr_http_encoding_t _transfer_encoding0;
-    ecr_http_encoding_t _transfer_encoding1;
+    ecr_str_t *_transfer_encoding;
+    ecr_str_t *_content_encoding;
     ecr_http_chunks_t _chunks[1];
     size_t _chunk_left;
     size_t _content_length;

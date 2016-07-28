@@ -306,7 +306,70 @@ void test_thread_local() {
     }
 }
 
+typedef struct {
+    uint32_t val;
+} sl_test_t;
+
+int sl_compare(const void *a, const void *b) {
+    const sl_test_t *va = a, *vb = b;
+    return va->val - vb->val;
+}
+
+void sl_free_handler(ecr_skiplist_t *sl, void *value, void *user) {
+    free(value);
+}
+
+void test_skip_list() {
+    ecr_skiplist_t sl;
+    ecr_skiplist_iter_t iter;
+    ecr_skiplist_init(&sl, sl_compare);
+
+    int i, j, f = 0, r = 0, val;
+    sl_test_t *v, *old;
+    srandom(time(NULL));
+    for (i = 0; i < 10000; i++) {
+        for (j = 0; j < 10; j++) {
+            v = malloc(sizeof(sl_test_t));
+            v->val = random() % 1000;
+            old = ecr_skiplist_set(&sl, v);
+            if (old) {
+                assert(old->val == v->val);
+                free(old);
+                f++;
+            }
+        }
+        ecr_skiplist_iter_init(&iter, &sl);
+        val = v->val;
+        for (j = 0; j < val % 5 && (v = ecr_skiplist_iter_next(&iter)); j++) {
+            val = v->val;
+            old = ecr_skiplist_remove(&sl, v);
+            assert(old == v);
+            free(old);
+            r++;
+        }
+    }
+    printf("size: %Zd, free: %d, remove: %d\n", ecr_skiplist_size(&sl), f, r);
+    ecr_skiplist_iter_init(&iter, &sl);
+    old = NULL;
+    while ((v = ecr_skiplist_iter_next(&iter))) {
+        if (old) {
+            assert(old->val <= v->val);
+        }
+        old = v;
+    }
+    ecr_skiplist_destroy(&sl, sl_free_handler, NULL);
+}
+
+void test_uint(int argc, char **argv) {
+    uint8_t a, b;
+    int8_t v;
+    a = (uint8_t) atoi(argv[1]);
+    b = (uint8_t) atoi(argv[2]);
+    v = a - b;
+    printf("a: %hhu, b: %hhu, a-b: %hhd\n", a, b, v);
+}
+
 int main(int argc, char **argv) {
-    test_thread_local();
+    test_uint(argc, argv);
     return EXIT_SUCCESS;
 }
