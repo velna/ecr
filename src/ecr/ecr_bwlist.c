@@ -1361,7 +1361,7 @@ void ecr_bwl_dump(ecr_bwl_t *list, FILE *stream) {
             size = 0;
             break;
         }
-        fprintf(stream, "%s %s: %Zd\n", group->name.ptr, ecr_bwl_type_to_string(group->type), size);
+        fprintf(stream, "%s %s: %lu\n", group->name.ptr, ecr_bwl_type_to_string(group->type), size);
         group = group->next;
     }
 

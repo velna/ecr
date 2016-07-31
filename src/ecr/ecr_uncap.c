@@ -101,7 +101,7 @@ int ecr_uncap_dot1q(ecr_str_t * uc, ecr_uncap_result_t* r) {
 }
 
 int ecr_uncap_ip(ecr_str_t * uc, ecr_uncap_result_t* r) {
-    if (uc->len < 0) {
+    if (uc->len < 1) {
         return -1;
     }
     u_int8_t version = uc->ptr[0] >> 4;

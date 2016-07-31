@@ -2,7 +2,7 @@ bin_PROGRAMS=ecr_test run_test
 
 ecr_test_SOURCES=ecr_test.c
 
-ecr_test_CFLAGS	=-Wall -gstabs+ $(shell pkg-config --cflags libmongoc-1.0)
+ecr_test_CFLAGS	=-Wall $(shell pkg-config --cflags libmongoc-1.0)
 
 ecr_test_LDADD		= \
 	/usr/local/lib/libecr.a \
@@ -20,7 +20,7 @@ run_test_SOURCES	= \
 	run_test.c \
 	http_decoder_test.c
 
-run_test_CFLAGS	=-Wall -gstabs+ $(shell pkg-config --cflags libmongoc-1.0)
+run_test_CFLAGS	=-Wall $(shell pkg-config --cflags libmongoc-1.0)
 
 run_test_LDADD		= \
 	/usr/local/lib/libecr.a \

@@ -106,15 +106,15 @@ void ecr_test_tlv() {
     ecr_tlv_init(&tlv2, 1, 1, &buf);
 
     pi = ecr_tlv_get(&tlv2, &type, &len);
-    printf("%Zd, %Zd, %x\n", type, len, *pi);
+    printf("%lu, %lu, %x\n", type, len, *pi);
     pc = ecr_tlv_get(&tlv2, &type, &len);
-    printf("%Zd, %Zd, %c\n", type, len, *pc);
+    printf("%lu, %lu, %c\n", type, len, *pc);
     ps = ecr_tlv_get(&tlv2, &type, &len);
-    printf("%Zd, %Zd, %hx\n", type, len, *ps);
+    printf("%lu, %lu, %hx\n", type, len, *ps);
     pl = ecr_tlv_get(&tlv2, &type, &len);
-    printf("%Zd, %Zd, %lx\n", type, len, *pl);
+    printf("%lu, %lu, %lx\n", type, len, *pl);
     pstr = ecr_tlv_get(&tlv2, &type, &len);
-    printf("%Zd, %Zd, %s\n", type, len, pstr);
+    printf("%lu, %lu, %s\n", type, len, pstr);
 
 }
 
@@ -228,7 +228,7 @@ void base64_test() {
     memset(str, 0xff, sizeof(str));
     size_t n = ecr_base64_encode_s(buf, str, 20);
     ecr_binary_dump(stdout, buf, n);
-    printf("%zd, [%s]\n", n, buf);
+    printf("%lu, [%s]\n", n, buf);
 }
 
 void ecr_version_test() {
@@ -266,7 +266,7 @@ void test_http_deocder() {
     message = ecr_http_new_request(&decoder);
     while ((req = requests[i])) {
         rc = ecr_http_decode(message, req, strlen(req));
-        printf("rc:%d, errno: %d, chunk_left:%zd, content_legnth:%zd\n", rc, message->error_no, message->_chunk_left,
+        printf("rc:%d, errno: %d, chunk_left:%lu, content_legnth:%lu\n", rc, message->error_no, message->_chunk_left,
                 message->_content_length);
         i++;
     }
@@ -295,7 +295,7 @@ void * thread_local_test_thread(void *user) {
 }
 
 void test_thread_local() {
-    int i;
+    size_t i;
     pthread_t threads[THREAD_LOCAL_THREADS];
     pthread_key_create(&thread_local_key, NULL);
     for (i = 0; i < THREAD_LOCAL_THREADS; i++) {
@@ -348,7 +348,7 @@ void test_skip_list() {
             r++;
         }
     }
-    printf("size: %Zd, free: %d, remove: %d\n", ecr_skiplist_size(&sl), f, r);
+    printf("size: %lu, free: %d, remove: %d\n", ecr_skiplist_size(&sl), f, r);
     ecr_skiplist_iter_init(&iter, &sl);
     old = NULL;
     while ((v = ecr_skiplist_iter_next(&iter))) {
