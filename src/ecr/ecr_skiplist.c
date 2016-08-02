@@ -191,10 +191,9 @@ void * ecr_skiplist_remove(ecr_skiplist_t *sl, void *value) {
     }
 }
 
-void * ecr_skiplist_find_lte(ecr_skiplist_t *sl, void *value) {
+void * ecr_skiplist_find_lt(ecr_skiplist_t *sl, void *value) {
     ecr_skiplist_node_t *node;
     int i;
-    void *ret;
 
     node = sl->header;
     for (i = sl->level - 1; i >= 0; i--) {
@@ -202,15 +201,10 @@ void * ecr_skiplist_find_lte(ecr_skiplist_t *sl, void *value) {
             node = node->level[i].forward;
         }
     }
-    ret = node->value;
-    node = node->level[0].forward;
-    if (node && sl->compare(value, node->value) <= 0) {
-        ret = node->value;
-    }
-    return ret;
+    return node->value;
 }
 
-void * ecr_skiplist_find_gte(ecr_skiplist_t *sl, void *value) {
+void * ecr_skiplist_find_gt(ecr_skiplist_t *sl, void *value) {
     ecr_skiplist_node_t *node;
     int i;
 
@@ -220,7 +214,8 @@ void * ecr_skiplist_find_gte(ecr_skiplist_t *sl, void *value) {
             node = node->level[i].forward;
         }
     }
-    return node->value;
+    node = node->level[0].forward;
+    return node ? node->value : NULL;
 }
 
 void * ecr_skiplist_find(ecr_skiplist_t *sl, void *value) {
