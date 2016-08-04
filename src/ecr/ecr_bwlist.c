@@ -615,34 +615,37 @@ static int ecr_bwl_load_stream(ecr_bwl_data_t *data, FILE *stream, ecr_bwl_sourc
                 free(name);
             }
             name = strdup(token);
-            if (name[0] == '$') {
-                if (ecr_hashmap_get(&source_data->item_groups, name, strlen(name))) {
-                    ecr_bwl_log(data->bwl, LOG_ERR, "duplicated group: %s", name);
-                    rc = -1;
-                    break;
-                }
-                group_items = ecr_list_new(16);
-                ecr_hashmap_put(&source_data->item_groups, name, strlen(name), group_items);
-            } else if (name[0] == '@') {
+            if (name[0] == '@') {
                 expr = ecr_hashmap_put(&source_data->expr_map, oline, strlen(oline), strdup(oline));
                 free_to_null(expr);
             } else {
-                group_items = NULL;
-                token = strtok_r(NULL, " \t\n\r", &save);
-                if (!token) {
-                    rc = -1;
-                    ecr_bwl_log(data->bwl, LOG_ERR, "ecr_bwlist syntax error, group type expected at line %d: %s", ln,
-                            source->source);
-                    break;
-                }
-                if (ecr_bwl_make_expr(data, source_data, name, token, &bwtype, &group_items)) {
-                    rc = -1;
-                    ecr_bwl_log(data->bwl, LOG_ERR, "ecr_bwlist syntax error, unknown group type [%s] at line %d: %s",
-                            token, ln, source->source);
-                    break;
-                }
-                if (bwtype == BWL_EXISTS) {
-                    rc++;
+                if (name[0] == '$') {
+                    if (ecr_hashmap_get(&source_data->item_groups, name, strlen(name))) {
+                        ecr_bwl_log(data->bwl, LOG_ERR, "duplicated group: %s", name);
+                        rc = -1;
+                        break;
+                    }
+                    group_items = ecr_list_new(16);
+                    ecr_hashmap_put(&source_data->item_groups, name, strlen(name), group_items);
+                } else {
+                    group_items = NULL;
+                    token = strtok_r(NULL, " \t\n\r", &save);
+                    if (!token) {
+                        rc = -1;
+                        ecr_bwl_log(data->bwl, LOG_ERR, "ecr_bwlist syntax error, group type expected at line %d: %s",
+                                ln, source->source);
+                        break;
+                    }
+                    if (ecr_bwl_make_expr(data, source_data, name, token, &bwtype, &group_items)) {
+                        rc = -1;
+                        ecr_bwl_log(data->bwl, LOG_ERR,
+                                "ecr_bwlist syntax error, unknown group type [%s] at line %d: %s", token, ln,
+                                source->source);
+                        break;
+                    }
+                    if (bwtype == BWL_EXISTS) {
+                        rc++;
+                    }
                 }
                 token = strtok_r(NULL, " \t\n\r", &save);
                 if (token && group_items) {
