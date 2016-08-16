@@ -130,6 +130,7 @@ int ecr_app_init(ecr_app_t *app, int argc, char **argv) {
         } else if (app->pid > 0) {
             L_INFO("forked process: %d", app->pid);
             ecr_echo_pid(app->pid, app->config.pid_file);
+            ecr_config_destroy(&app->config_props);
             return 1;
         } else {
             app->pid = getpid();

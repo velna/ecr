@@ -12,6 +12,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdio.h>
+#include <zlib.h>
 
 #define DECODE_INIT             0
 
@@ -121,9 +122,9 @@ static int ecr_http_token_kv(ecr_str_t *key_out, ecr_str_t *value_out, ecr_str_t
         s++;
     }
     value.len = s - value.ptr - sp;
+    *key_out = key;
+    *value_out = value;
     if (s + 1 < end) {
-        *key_out = key;
-        *value_out = value;
         data->len -= s - data->ptr + 2;
         data->ptr = s + 2;
         return 0;
@@ -197,7 +198,7 @@ static ecr_http_method_t ecr_http_parse_method(ecr_str_t *data) {
 }
 
 static ecr_http_encoding_t ecr_http_parse_encoding(ecr_str_t *data) {
-    ecr_http_encoding_t ret = HTTP_ENCODING_UNKNOWN;
+    ecr_http_encoding_t ret = HTTP_ENCODING_NULL;
 
     if (data->len <= 0) {
         return ret;
@@ -232,6 +233,9 @@ static ecr_http_encoding_t ecr_http_parse_encoding(ecr_str_t *data) {
             ret = HTTP_DEFLATE;
         }
         break;
+    default:
+        ret = HTTP_ENCODING_UNKNOWN;
+        break;
     }
     return ret;
 }
@@ -242,37 +246,26 @@ static int ecr_http_get_int_header(ecr_fixedhash_t *headers, ecr_fixedhash_key_t
 }
 
 static int ecr_http_check_content(ecr_http_message_t *message) {
-    ecr_str_t *value, data, out;
     ecr_http_keys_t *http_keys = &message->decoder->keys;
+    int content_length;
 
     // Transfer-Encoding
-    value = ecr_fixedhash_get(message->headers, http_keys->Transfer_Encoding);
-    message->_transfer_encoding0 = message->_transfer_encoding1 = HTTP_ENCODING_UNKNOWN;
-    if (value) {
-        data = *value;
-        if (ecr_str_tok(&data, ", ", &out)) {
-            message->_transfer_encoding0 = ecr_http_parse_encoding(&out);
-            if (ecr_str_tok(&data, ", ", &out)) {
-                message->_transfer_encoding1 = ecr_http_parse_encoding(&out);
-            }
-        }
-    }
+    message->_transfer_encoding = ecr_fixedhash_get(message->headers, http_keys->Transfer_Encoding);
 
-    if (message->_transfer_encoding0 != HTTP_ENCODING_UNKNOWN) { // using Transfer_Encoding
+    if (message->_transfer_encoding) { // using Transfer_Encoding
         message->_content_length = 0;
         return DECODE_CONTENT_CHUNKED;
-    } else if ((message->_content_length = ecr_http_get_int_header(message->headers, http_keys->Content_Length, -1))
-            >= 0) { // using Content-Length
+    } else if ((content_length = ecr_http_get_int_header(message->headers, http_keys->Content_Length, -1)) >= 0) { // using Content-Length
+        message->_content_length = content_length;
         return DECODE_CONTENT_LENGTHED;
     } else {
-        if ((message->type == HTTP_RESPONSE && message->response.request_method == HTTP_HEAD)
+        if ((message->type == HTTP_RESPONSE // response
+                && (message->response.request_method == HTTP_HEAD // head
                 || message->response.status / 100 == 1 // 1xx
-                || message->response.status == 204 // 204
-                || message->response.status == 304 // 304
-                || (message->type == HTTP_RESPONSE && message->response.request_method == HTTP_CONNECT
-                        && message->response.status / 100 == 2) // 2xx response to CONNECT
-                || message->type == HTTP_REQUEST // else if is a request
-                        ) {
+                || message->response.status == 204 || message->response.status == 304
+                        || (message->response.request_method == HTTP_CONNECT && message->response.status / 100 == 2) // 2xx to CONNECT
+                )) || message->type == HTTP_REQUEST // else if is a request
+                ) {
             message->_content_length = 0;
             return DECODE_CONTENT_LENGTHED;
         }
@@ -288,6 +281,7 @@ static int ecr_http_make_content(ecr_http_message_t *message, ecr_str_t *data) {
     if (message->_buf_idx >= message->_buf_size) {
         return -1;
     }
+//    printf("message: %p, _buf_idx: %d\n", message, message->_buf_idx);
     data_len = message->_content_length > data->len ? data->len : message->_content_length;
     buf = message->_buf + message->_buf_idx;
     buf->data.ptr = data->ptr;
@@ -320,34 +314,39 @@ int ecr_http_decode(ecr_http_message_t *message, char *ptr, size_t size) {
     } else if (message->decode_status == HTTP_DECODE_OK) {
         ecr_http_decode_err(message, HTTP_ERR_DONE)
         return HTTP_DECODE_ERR;
+    } else if (message->_chunk_used > message->decoder->max_content_chunks) {
+        ecr_http_decode_err(message, HTTP_ERR_OUT_OF_BUF)
+        return HTTP_DECODE_ERR;
     }
 
+    message->_chunk_used++;
     last_chunk = message->_chunks->tail;
     if (message->_chunk_left) {
         if (last_chunk) {
-            if (last_chunk->size == message->_chunk_left) {
-                linked_list_drop(message->_chunks, last_chunk);
-                chunk = realloc(last_chunk, sizeof(ecr_http_chunk_t) + last_chunk->size + size);
-                memcpy(chunk->data + chunk->size, ptr, size);
-                chunk->size += size;
-            } else {
-                chunk = malloc(sizeof(ecr_http_chunk_t) + message->_chunk_left + size);
-                chunk->size = message->_chunk_left + size;
-                memcpy(chunk->data, last_chunk->data + last_chunk->size - message->_chunk_left, message->_chunk_left);
-                memcpy(chunk->data + message->_chunk_left, ptr, size);
-            }
+//            if (last_chunk->size == message->_chunk_left) {
+//                linked_list_drop(message->_chunks, last_chunk);
+//                chunk = realloc(last_chunk, sizeof(ecr_http_chunk_t) + last_chunk->size + size);
+//                memcpy(chunk->data + chunk->size, ptr, size);
+//                chunk->size += size;
+//            } else {
+            chunk = malloc(sizeof(ecr_http_chunk_t) + message->_chunk_left + size);
+            chunk->data.len = message->_chunk_left + size;
+            chunk->data.ptr = chunk->_data;
+            memcpy(chunk->_data, last_chunk->_data + last_chunk->data.len - message->_chunk_left, message->_chunk_left);
+            memcpy(chunk->_data + message->_chunk_left, ptr, size);
+//            }
         } else {
             ecr_http_decode_err(message, HTTP_ERR_CHUNK_LEFT)
             return HTTP_DECODE_ERR;
         }
     } else {
         chunk = malloc(sizeof(ecr_http_chunk_t) + size);
-        chunk->size = size;
-        memcpy(chunk->data, ptr, size);
+        chunk->data.len = size;
+        chunk->data.ptr = chunk->_data;
+        memcpy(chunk->_data, ptr, size);
     }
     linked_list_add_last(message->_chunks, chunk);
-    data.len = chunk->size;
-    data.ptr = chunk->data;
+    data = chunk->data;
 
     message->decode_status = HTTP_DECODE_INIT;
     while (message->decode_status == HTTP_DECODE_INIT) {
@@ -460,12 +459,15 @@ int ecr_http_decode(ecr_http_message_t *message, char *ptr, size_t size) {
                 } else {
                     message->_status = ecr_http_check_content(message);
                 }
-            } else if (token_rc) {
-                message->decode_status = HTTP_DECODE_MORE;
             } else {
-                // read next header next round
+                // put the header into headers no matter the header is complete
                 if (buf && ecr_fixedhash_put_original(message->headers, key.ptr, key.len, &buf->data) == 0) {
                     buf->type = HTTP_BUF_HEADER;
+                }
+                if (token_rc) {
+                    message->decode_status = HTTP_DECODE_MORE;
+                } else if (buf) {
+                    // increase the _buf_idx if the header is complete
                     message->_buf_idx++;
                 }
             }
@@ -534,7 +536,7 @@ void ecr_http_decoder_init(ecr_http_decoder_t *decoder, ecr_fixedhash_ctx_t *ctx
     decoder->keys.Reason = ecr_fixedhash_getkey(ctx, HTTP_REASON, strlen(HTTP_REASON));
     decoder->keys.Host = ecr_fixedhash_getkey(ctx, HTTP_HOST, strlen(HTTP_HOST));
     decoder->keys.Referer = ecr_fixedhash_getkey(ctx, HTTP_REFERER, strlen(HTTP_REFERER));
-    decoder->keys.User_Agent = ecr_fixedhash_getkey(ctx, HTTP_USERAGENT, strlen(HTTP_USERAGENT));
+    decoder->keys.User_Agent = ecr_fixedhash_getkey(ctx, HTTP_USER_AGENT, strlen(HTTP_USER_AGENT));
     decoder->keys.Cookie = ecr_fixedhash_getkey(ctx, HTTP_COOKIE, strlen(HTTP_COOKIE));
     decoder->keys.Accept = ecr_fixedhash_getkey(ctx, HTTP_ACCEPT, strlen(HTTP_ACCEPT));
     decoder->keys.Content_Length = ecr_fixedhash_getkey(ctx, HTTP_CONTENT_LENGTH, strlen(HTTP_CONTENT_LENGTH));
@@ -551,13 +553,15 @@ static ecr_http_message_t * ecr_http_message_new(ecr_http_decoder_t *decoder) {
 
     hash_size = ecr_fixedhash_sizeof(decoder->hash_ctx);
     hdr_buf_size = ecr_fixedhash_ctx_max_keys(decoder->hash_ctx) + decoder->max_content_chunks;
-    hash_offset = sizeof(ecr_http_message_t) + hdr_buf_size * sizeof(ecr_str_t);
+    hash_offset = sizeof(ecr_http_message_t) + hdr_buf_size * sizeof(ecr_http_buf_t);
     message = calloc(1, hash_offset + hash_size);
     message->headers = ecr_fixedhash_init(decoder->hash_ctx, ((char *) message) + hash_offset, hash_size);
     message->_buf_size = hdr_buf_size;
     message->decoder = decoder;
     message->decode_status = HTTP_DECODE_INIT;
     message->_status = DECODE_INIT;
+//    printf("message: %p, _buf_size: %d, hash_offset: %Zd, hash_size: %Zd\n", message, message->_buf_size, hash_offset,
+//            hash_size);
     return message;
 }
 
@@ -580,50 +584,6 @@ ecr_http_message_type_t ecr_http_guess(char *data, size_t size) {
             (ecr_http_parse_version(&str) == HTTP_VERSION_UNKNOWN ? HTTP_TYPE_UNKNOWN : HTTP_RESPONSE) : HTTP_REQUEST;
 }
 
-void ecr_http_message_dump(ecr_http_message_t *message, FILE *stream) {
-    ecr_http_chunk_t *chunk;
-    ecr_fixedhash_iter_t iter;
-    ecr_str_t key, *value;
-
-#define WRITE_FIELD(name, str) \
-    fprintf(stream, "%s: [", name); \
-    fwrite((str).ptr, (str).len, 1, stream); \
-    fprintf(stream, "]\n");
-
-    switch (message->type) {
-    case HTTP_REQUEST:
-        WRITE_FIELD("method", message->request.method_str)
-        WRITE_FIELD("uri", message->request.uri)
-        WRITE_FIELD("version", message->version_str)
-        break;
-    case HTTP_RESPONSE:
-        WRITE_FIELD("version", message->version_str)
-        WRITE_FIELD("status", message->response.status_str)
-        WRITE_FIELD("reason", message->response.reason)
-        break;
-    default:
-        fprintf(stream, "unknown message type: %d\n", message->type);
-        break;
-    }
-
-    ecr_fixedhash_iter_init(&iter, message->headers);
-    while ((value = ecr_fixedhash_iter_next(&iter, NULL, &key))) {
-        WRITE_FIELD(key.ptr, *value)
-    }
-
-    chunk = message->_chunks->head;
-    while (chunk) {
-        ecr_binary_dump(stream, chunk->data, chunk->size);
-        chunk = chunk->next;
-    }
-    chunk = message->content->head;
-    while (chunk) {
-        ecr_binary_dump(stream, chunk->data, chunk->size);
-        chunk = chunk->next;
-    }
-#undef WRITE_FIELD
-}
-
 static void ecr_http_free_chunks(ecr_http_chunks_t *chunks) {
     ecr_http_chunk_t *chunk, *next;
     chunk = chunks->head;
@@ -635,6 +595,212 @@ static void ecr_http_free_chunks(ecr_http_chunks_t *chunks) {
     chunks->head = chunks->tail = NULL;
 }
 
+static int ecr_http_inflate(ecr_http_chunks_t *from, ecr_http_chunks_t *to, int window_bits) {
+    int rc = Z_STREAM_END;
+    z_stream strm;
+    ecr_http_chunk_t *chunk_in, *chunk_out;
+    size_t out_size;
+
+    strm.zalloc = Z_NULL;
+    strm.zfree = Z_NULL;
+    strm.opaque = Z_NULL;
+    strm.avail_in = 0;
+    strm.next_in = Z_NULL;
+    if (inflateInit2(&strm, window_bits) != Z_OK) {
+        return -1;
+    }
+    chunk_in = from->head;
+    while (chunk_in) {
+        if ((strm.avail_in = chunk_in->data.len) == 0) {
+            chunk_in = chunk_in->next;
+            continue;
+        }
+        strm.next_in = (Bytef*) chunk_in->data.ptr;
+
+        /* run inflate() on input until output buffer not full */
+        do {
+            out_size = chunk_in->data.len << 1;
+            chunk_out = calloc(1, sizeof(ecr_http_chunk_t) + out_size);
+            chunk_out->data.ptr = chunk_out->_data;
+            chunk_out->data.len = out_size;
+            linked_list_add_last(to, chunk_out);
+
+            strm.avail_out = out_size;
+            strm.next_out = (Bytef*) chunk_out->data.ptr;
+            rc = inflate(&strm, Z_NO_FLUSH);
+            switch (rc) {
+            case Z_NEED_DICT:
+            case Z_DATA_ERROR:
+            case Z_MEM_ERROR:
+                inflateEnd(&strm);
+                ecr_http_free_chunks(to);
+                return -1;
+            }
+            chunk_out->data.len = out_size - strm.avail_out;
+        } while (strm.avail_out == 0);
+        /* done when inflate() says it's done */
+        chunk_in = chunk_in->next;
+    }
+    /* clean up and return */
+    inflateEnd(&strm);
+    if (rc == Z_STREAM_END) {
+        return 0;
+    } else {
+        ecr_http_free_chunks(to);
+        return -1;
+    }
+}
+
+static int ecr_http_decode_content(ecr_str_t *encoding_str, ecr_http_chunks_t *content) {
+    ecr_str_t data, out = { NULL };
+    ecr_http_encoding_t encoding;
+    const ecr_http_chunks_t ZERO = { NULL };
+    ecr_http_chunks_t to[1] = { { NULL } };
+    uint16_t cmf_flg;
+    int rc, window_bit;
+
+    if (!encoding_str) {
+        return 0;
+    }
+    data = *encoding_str;
+    if (ecr_str_tok(&data, ", ", &out)) {
+        if (ecr_http_decode_content(&data, content) < 0) {
+            return -1;
+        }
+        encoding = ecr_http_parse_encoding(&out);
+        switch (encoding) {
+        case HTTP_COMPRESS:
+            rc = -1;
+            break;
+        case HTTP_DEFLATE:
+            window_bit = 15;
+            if (content->head && content->head->data.len >= 2) {
+                cmf_flg = *((uint16_t*) content->head->data.ptr);
+                if ((cmf_flg & 0x7800) != 0x7800 || cmf_flg % 31 != 0) {
+                    // for raw deflate
+                    window_bit = -15;
+                }
+            }
+            rc = ecr_http_inflate(content, to, window_bit);
+            break;
+        case HTTP_GZIP:
+            rc = ecr_http_inflate(content, to, 15 + 16);
+            break;
+        case HTTP_ENCODING_NULL:
+        case HTTP_CHUNKED:
+        case HTTP_IDENTITY:
+            *to = *content;
+            *content = ZERO;
+            rc = 0;
+            break;
+        default:
+            rc = -1;
+            break;
+        }
+        if (rc >= 0) {
+            ecr_http_free_chunks(content);
+            *content = *to;
+        }
+    } else {
+        rc = 0;
+    }
+    return rc;
+}
+
+int ecr_http_message_make_content(ecr_http_message_t *message, ecr_str_t *content_out) {
+    ecr_http_chunk_t *chunk;
+    ecr_http_chunks_t content[1] = { { NULL } };
+    int i;
+    char *ptr;
+
+    if (message->decode_status != HTTP_DECODE_OK) {
+        return -1;
+    }
+    if (!message->content) {
+        for (i = message->_content_buf_idx; message->_buf[i].type == HTTP_BUF_CONTENT && i < message->_buf_size; i++) {
+            chunk = calloc(1, sizeof(ecr_http_chunk_t));
+            chunk->data = message->_buf[i].data;
+            linked_list_add_last(content, chunk);
+        }
+        if (ecr_http_decode_content(message->_transfer_encoding, content) < 0) {
+            ecr_http_free_chunks(content);
+            return -1;
+        }
+
+        message->_content_encoding = ecr_fixedhash_get(message->headers, message->decoder->keys.Content_Encoding);
+        if (ecr_http_decode_content(message->_content_encoding, content) < 0) {
+            ecr_http_free_chunks(content);
+            return -1;
+        }
+
+        message->content = malloc(sizeof(ecr_http_chunks_t));
+        *message->content = *content;
+    }
+    chunk = message->content->head;
+    i = 0;
+    while (chunk) {
+        i += (int) chunk->data.len;
+        chunk = chunk->next;
+    }
+    if (content_out && i > 0) {
+        ptr = content_out->ptr = malloc(content_out->len = i);
+        chunk = message->content->head;
+        while (chunk) {
+            ptr = mempcpy(ptr, chunk->data.ptr, chunk->data.len);
+            chunk = chunk->next;
+        }
+    }
+    return i;
+}
+
+void ecr_http_message_dump(ecr_http_message_t *message, FILE *stream) {
+    ecr_http_chunk_t *chunk;
+    ecr_fixedhash_iter_t iter;
+    ecr_str_t key, *value;
+
+    fprintf(stream, "{===\n");
+    fprintf(stream, "[decode_status: %hhd, "
+            "error_no: %hhd, "
+            "_status: %hhd, "
+            "content_length: %zd", message->decode_status, message->error_no, message->_status,
+            message->_content_length);
+
+    fputs(", transfer_encoding: ", stream);
+    if (message->_transfer_encoding && message->_transfer_encoding->len) {
+        fwrite(message->_transfer_encoding->ptr, message->_transfer_encoding->len, 1, stream);
+    } else {
+        fputs("null", stream);
+    }
+    fputs(", content_encoding: ", stream);
+    if (message->_content_encoding && message->_content_encoding->len) {
+        fwrite(message->_content_encoding->ptr, message->_content_encoding->len, 1, stream);
+    } else {
+        fputs("null", stream);
+    }
+    fputs("]\n", stream);
+
+    ecr_fixedhash_iter_init(&iter, message->headers);
+    while ((value = ecr_fixedhash_iter_next(&iter, NULL, &key))) {
+        fprintf(stream, "%s: [", key.ptr);
+        fwrite(value->ptr, value->len, 1, stream);
+        fprintf(stream, "]\n");
+    }
+
+    chunk = message->_chunks->head;
+    while (chunk) {
+        ecr_binary_dump(stream, chunk->data.ptr, chunk->data.len);
+        chunk = chunk->next;
+    }
+    if (message->content) {
+        chunk = message->content->head;
+        while (chunk) {
+            ecr_binary_dump(stream, chunk->data.ptr, chunk->data.len);
+            chunk = chunk->next;
+        }
+    }
+    fprintf(stream, "===}\n");
+}
+
 void ecr_http_message_reset(ecr_http_message_t *message) {
     ecr_fixedhash_t *headers = message->headers;
     size_t buf_size = message->_buf_size;
@@ -643,7 +809,10 @@ void ecr_http_message_reset(ecr_http_message_t *message) {
     ecr_http_method_t request_method = message->response.request_method;
 
     ecr_http_free_chunks(message->_chunks);
-    ecr_http_free_chunks(message->content);
+    if (message->content) {
+        ecr_http_free_chunks(message->content);
+        free_to_null(message->content);
+    }
     ecr_fixedhash_clear(headers);
     memset(message, 0, sizeof(ecr_http_message_t));
 
@@ -658,6 +827,9 @@ void ecr_http_message_reset(ecr_http_message_t *message) {
 
 void ecr_http_message_destroy(ecr_http_message_t *message) {
     ecr_http_free_chunks(message->_chunks);
-    ecr_http_free_chunks(message->content);
+    if (message->content) {
+        ecr_http_free_chunks(message->content);
+        free_to_null(message->content);
+    }
     free(message);
 }

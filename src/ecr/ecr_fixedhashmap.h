@@ -30,9 +30,7 @@ typedef struct {
     ecr_fixedhash_t *map;
 } ecr_fixedhash_iter_t;
 
-int ecr_fixedhash_ctx_init(ecr_fixedhash_ctx_t *ctx, const ecr_str_t* keys, int n);
-
-int ecr_fixedhash_ctx_init_string(ecr_fixedhash_ctx_t *ctx, const char *keys);
+int ecr_fixedhash_ctx_init(ecr_fixedhash_ctx_t *ctx);
 
 int ecr_fixedhash_ctx_add_keys(ecr_fixedhash_ctx_t *ctx, const char *keys);
 

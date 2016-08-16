@@ -56,9 +56,9 @@ void * ecr_skiplist_remove(ecr_skiplist_t *sl, void *value);
 
 void * ecr_skiplist_find(ecr_skiplist_t *sl, void *value);
 
-void * ecr_skiplist_find_lte(ecr_skiplist_t *sl, void *value);
+void * ecr_skiplist_find_lt(ecr_skiplist_t *sl, void *value);
 
-void * ecr_skiplist_find_gte(ecr_skiplist_t *sl, void *value);
+void * ecr_skiplist_find_gt(ecr_skiplist_t *sl, void *value);
 
 void ecr_skiplist_free_value_handler(ecr_skiplist_t *, void *value, void *user);
 

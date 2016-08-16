@@ -195,7 +195,7 @@ void ecr_binary_dump(FILE *out, const void *bin, size_t len);
 
 void ecr_crc32_mix(const unsigned char *s, unsigned int len, void *out);
 
-inline void ecr_crc32_hash_mix(const void *s, int len, uint32_t seed, void *out);
+void ecr_crc32_hash_mix(const void *s, int len, uint32_t seed, void *out);
 
 uint32_t ecr_crc32_ch(uint32_t crc_magic, char ch);
 

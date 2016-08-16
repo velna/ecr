@@ -48,6 +48,8 @@
                 if((p) == (ll)->tail) { \
                     (ll)->tail = NULL; \
                 } \
+                (p)->prev = NULL; \
+                (p)->next = NULL; \
             } else { \
                 p = NULL; \
             } \
@@ -64,6 +66,8 @@
                 if((p) == (ll)->head) { \
                     (ll)->head = NULL; \
                 } \
+                (p)->prev = NULL; \
+                (p)->next = NULL; \
             } else { \
                 p = NULL; \
             } \

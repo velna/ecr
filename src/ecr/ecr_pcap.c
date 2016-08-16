@@ -22,7 +22,7 @@ static void * ecr_pcap_routine(void *user) {
 
     tid = AO_fetch_and_add1(&pool->tid);
     L_INFO("cap thread %d started.", tid);
-    ecr_set_thread_name("pcap-%Zd", tid);
+    ecr_set_thread_name("pcap-%d", tid);
     capable_chain = &pool->capable_chains[tid];
 
     while (pool->running) {

@@ -238,7 +238,7 @@ static int ecr_wm_default_match_handler(ecr_wm_t *wm, const char *str, size_t le
 
 int ecr_wm_match_ex(ecr_wm_t *wm, const char *str, size_t len, ecr_wm_match_handler handler, void *user) {
     int shift, c = 0, idx, prefix, hash, ok;
-    const char *p, *p_end, *p0;
+    const char *p, *p_end, *p0, *s_end;
     ecr_wm_pattern_t * pattern, *pattern_end;
 
     if (len < wm->min_len) {
@@ -247,13 +247,14 @@ int ecr_wm_match_ex(ecr_wm_t *wm, const char *str, size_t len, ecr_wm_match_hand
 
     p = str + wm->min_len - WM_MIN_BLOCK;
     p_end = str + len;
+    s_end = p_end - WM_MIN_BLOCK + 1;
     pattern_end = wm->plist + wm->plist_size;
 
     //L_INFO("min_len=%d", wm->min_len);
-    while (p < p_end) {
+    while (p < s_end) {
         while ((shift = wm->shift[WM_HASH(p)])) {
             p += shift;
-            if (p > p_end) {
+            if (p >= s_end) {
                 return c;
             }
         }

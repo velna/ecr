@@ -111,7 +111,7 @@ int ecr_list_remove(ecr_list_t *l, void *value) {
     for (i = 0; i < l->size; i++) {
         if (l->data[i] == value) {
             if (i < l->size - 1) {
-                memmove(l->data + i, l->data + i + 1, (l->size - i) * sizeof(void*));
+                memmove(l->data + i, l->data + i + 1, (l->size - i - 1) * sizeof(void*));
             }
             l->size--;
             rc = 0;
@@ -129,7 +129,7 @@ void * ecr_list_remove_at(ecr_list_t *l, int i) {
     assert(i >= 0 && i < l->size);
     ret = l->data[i];
     if (i < l->size - 1) {
-        memmove(l->data + i, l->data + i + 1, (l->size - i) * sizeof(void*));
+        memmove(l->data + i, l->data + i + 1, (l->size - i - 1) * sizeof(void*));
     }
     l->size--;
     pthread_rwlock_unlock(&l->rwlock);

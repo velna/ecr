@@ -78,7 +78,7 @@ static int ecr_skiplist_random_level(void) {
 }
 
 static void ecr_skiplist_add0(ecr_skiplist_t *sl, void *value, ecr_skiplist_node_t **update) {
-    register int i;
+    int i;
     ecr_skiplist_node_t *node;
     int level;
 
@@ -105,8 +105,8 @@ static void ecr_skiplist_add0(ecr_skiplist_t *sl, void *value, ecr_skiplist_node
 
 void ecr_skiplist_add(ecr_skiplist_t *sl, void *value) {
     ecr_skiplist_node_t *update[ECR_SKIPLIST_MAXLEVEL];
-    register ecr_skiplist_node_t *node;
-    register int i;
+    ecr_skiplist_node_t *node;
+    int i;
 
     node = sl->header;
     for (i = sl->level - 1; i >= 0; i--) {
@@ -120,8 +120,8 @@ void ecr_skiplist_add(ecr_skiplist_t *sl, void *value) {
 
 void * ecr_skiplist_set(ecr_skiplist_t *sl, void *value) {
     ecr_skiplist_node_t *update[ECR_SKIPLIST_MAXLEVEL];
-    register ecr_skiplist_node_t *node;
-    register int i;
+    ecr_skiplist_node_t *node;
+    int i;
     void *ret;
 
     node = sl->header;
@@ -151,7 +151,7 @@ void * ecr_skiplist_tail(ecr_skiplist_t *sl) {
 }
 
 static void ecr_skiplist_remove0(ecr_skiplist_t *sl, ecr_skiplist_node_t *x, ecr_skiplist_node_t **update) {
-    register int i;
+    int i;
     for (i = 0; i < sl->level; i++) {
         if (update[i]->level[i].forward == x) {
             update[i]->level[i].forward = x->level[i].forward;
@@ -169,8 +169,8 @@ static void ecr_skiplist_remove0(ecr_skiplist_t *sl, ecr_skiplist_node_t *x, ecr
 
 void * ecr_skiplist_remove(ecr_skiplist_t *sl, void *value) {
     ecr_skiplist_node_t *update[ECR_SKIPLIST_MAXLEVEL];
-    register ecr_skiplist_node_t *node;
-    register int i;
+    ecr_skiplist_node_t *node;
+    int i;
     void *ret;
 
     node = sl->header;
@@ -191,10 +191,9 @@ void * ecr_skiplist_remove(ecr_skiplist_t *sl, void *value) {
     }
 }
 
-void * ecr_skiplist_find_lte(ecr_skiplist_t *sl, void *value) {
-    register ecr_skiplist_node_t *node;
-    register int i;
-    void *ret;
+void * ecr_skiplist_find_lt(ecr_skiplist_t *sl, void *value) {
+    ecr_skiplist_node_t *node;
+    int i;
 
     node = sl->header;
     for (i = sl->level - 1; i >= 0; i--) {
@@ -202,17 +201,12 @@ void * ecr_skiplist_find_lte(ecr_skiplist_t *sl, void *value) {
             node = node->level[i].forward;
         }
     }
-    ret = node->value;
-    node = node->level[0].forward;
-    if (node && sl->compare(value, node->value) <= 0) {
-        ret = node->value;
-    }
-    return ret;
+    return node->value;
 }
 
-void * ecr_skiplist_find_gte(ecr_skiplist_t *sl, void *value) {
-    register ecr_skiplist_node_t *node;
-    register int i;
+void * ecr_skiplist_find_gt(ecr_skiplist_t *sl, void *value) {
+    ecr_skiplist_node_t *node;
+    int i;
 
     node = sl->header;
     for (i = sl->level - 1; i >= 0; i--) {
@@ -220,12 +214,13 @@ void * ecr_skiplist_find_gte(ecr_skiplist_t *sl, void *value) {
             node = node->level[i].forward;
         }
     }
-    return node->value;
+    node = node->level[0].forward;
+    return node ? node->value : NULL;
 }
 
 void * ecr_skiplist_find(ecr_skiplist_t *sl, void *value) {
-    register ecr_skiplist_node_t *node;
-    register int i;
+    ecr_skiplist_node_t *node;
+    int i;
 
     node = sl->header;
     for (i = sl->level - 1; i >= 0; i--) {

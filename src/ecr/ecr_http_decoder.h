@@ -39,7 +39,7 @@
 #define HTTP_REASON                 "reason"
 #define HTTP_HOST                   "host"
 #define HTTP_REFERER                "referer"
-#define HTTP_USERAGENT              "user-agent"
+#define HTTP_USER_AGENT             "user-agent"
 #define HTTP_COOKIE                 "cookie"
 #define HTTP_ACCEPT                 "accept"
 #define HTTP_CONTENT_LENGTH         "content-length"
@@ -54,7 +54,7 @@
                                     HTTP_REASON "," \
                                     HTTP_HOST "," \
                                     HTTP_REFERER "," \
-                                    HTTP_USERAGENT "," \
+                                    HTTP_USER_AGENT "," \
                                     HTTP_COOKIE "," \
                                     HTTP_ACCEPT "," \
                                     HTTP_CONTENT_LENGTH "," \
@@ -103,7 +103,7 @@ typedef enum {
  * for both Transfer-Encoding and Content-Encoding
  */
 typedef enum {
-    HTTP_ENCODING_UNKNOWN = 1, HTTP_CHUNKED, HTTP_GZIP, HTTP_COMPRESS, HTTP_DEFLATE, HTTP_IDENTITY
+    HTTP_ENCODING_NULL = 0, HTTP_ENCODING_UNKNOWN, HTTP_CHUNKED, HTTP_GZIP, HTTP_COMPRESS, HTTP_DEFLATE, HTTP_IDENTITY
 } ecr_http_encoding_t;
 
 typedef enum {
@@ -113,8 +113,8 @@ typedef enum {
 typedef struct ecr_http_chunk_s {
     struct ecr_http_chunk_s *prev;
     struct ecr_http_chunk_s *next;
-    size_t size;
-    char data[];
+    ecr_str_t data;
+    char _data[];
 } ecr_http_chunk_t;
 
 typedef struct {
@@ -151,7 +151,7 @@ typedef struct ecr_http_message_s {
         } response;
     };
     ecr_fixedhash_t *headers;
-    ecr_http_chunks_t content[1];
+    ecr_http_chunks_t *content;
     ecr_http_decoder_t *decoder;
     int8_t error_no;
     int8_t decode_status;
@@ -159,12 +159,12 @@ typedef struct ecr_http_message_s {
     //private fields
     int8_t _status;
     int8_t _next_status;
+    int _chunk_used;
     int _content_buf_idx;
     int _buf_size;
     int _buf_idx;
-    ecr_http_encoding_t _transfer_encoding0;
-    ecr_http_encoding_t _transfer_encoding1;
-    ecr_http_encoding_t _content_encoding;
+    ecr_str_t *_transfer_encoding;
+    ecr_str_t *_content_encoding;
     ecr_http_chunks_t _chunks[1];
     size_t _chunk_left;
     size_t _content_length;
@@ -185,6 +185,8 @@ ecr_http_message_type_t ecr_http_guess(char *data, size_t size);
  * return HTTP_DECODE_OK for complete, HTTP_DECODE_MORE for incomplete, HTTP_DECODE_ERR for error
  */
 int ecr_http_decode(ecr_http_message_t *message, char *data, size_t size);
+
+int ecr_http_message_make_content(ecr_http_message_t *message, ecr_str_t *content_out);
 
 void ecr_http_message_dump(ecr_http_message_t *message, FILE *stream);
 

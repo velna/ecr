@@ -106,15 +106,15 @@ void ecr_test_tlv() {
     ecr_tlv_init(&tlv2, 1, 1, &buf);
 
     pi = ecr_tlv_get(&tlv2, &type, &len);
-    printf("%Zd, %Zd, %x\n", type, len, *pi);
+    printf("%lu, %lu, %x\n", type, len, *pi);
     pc = ecr_tlv_get(&tlv2, &type, &len);
-    printf("%Zd, %Zd, %c\n", type, len, *pc);
+    printf("%lu, %lu, %c\n", type, len, *pc);
     ps = ecr_tlv_get(&tlv2, &type, &len);
-    printf("%Zd, %Zd, %hx\n", type, len, *ps);
+    printf("%lu, %lu, %hx\n", type, len, *ps);
     pl = ecr_tlv_get(&tlv2, &type, &len);
-    printf("%Zd, %Zd, %lx\n", type, len, *pl);
+    printf("%lu, %lu, %lx\n", type, len, *pl);
     pstr = ecr_tlv_get(&tlv2, &type, &len);
-    printf("%Zd, %Zd, %s\n", type, len, pstr);
+    printf("%lu, %lu, %s\n", type, len, pstr);
 
 }
 
@@ -155,7 +155,8 @@ void test_bwlist(const char *bwlist_file) {
     ecr_str_t host, uri;
     ecr_bwl_result_t *result;
 
-    ecr_fixedhash_ctx_init_string(&ctx, "host,uri");
+    ecr_fixedhash_ctx_init(&ctx);
+    ecr_fixedhash_ctx_add_keys(&ctx, "host,uri");
     hash = ecr_fixedhash_init(&ctx, mem, 4096);
     host.ptr = "www.sabc.com";
     host.len = strlen(host.ptr);
@@ -227,7 +228,7 @@ void base64_test() {
     memset(str, 0xff, sizeof(str));
     size_t n = ecr_base64_encode_s(buf, str, 20);
     ecr_binary_dump(stdout, buf, n);
-    printf("%zd, [%s]\n", n, buf);
+    printf("%lu, [%s]\n", n, buf);
 }
 
 void ecr_version_test() {
@@ -238,7 +239,8 @@ void test_http_deocder() {
     ecr_http_message_t *message;
     ecr_fixedhash_ctx_t hash_ctx;
     ecr_http_decoder_t decoder;
-    ecr_fixedhash_ctx_init_string(&hash_ctx, HTTP_HASH_FIELDS);
+    ecr_fixedhash_ctx_init(&hash_ctx);
+    ecr_fixedhash_ctx_add_keys(&hash_ctx, HTTP_HASH_FIELDS);
 
     ecr_http_decoder_init(&decoder, &hash_ctx, 16);
 
@@ -264,7 +266,7 @@ void test_http_deocder() {
     message = ecr_http_new_request(&decoder);
     while ((req = requests[i])) {
         rc = ecr_http_decode(message, req, strlen(req));
-        printf("rc:%d, errno: %d, chunk_left:%zd, content_legnth:%zd\n", rc, message->error_no, message->_chunk_left,
+        printf("rc:%d, errno: %d, chunk_left:%lu, content_legnth:%lu\n", rc, message->error_no, message->_chunk_left,
                 message->_content_length);
         i++;
     }
@@ -293,7 +295,7 @@ void * thread_local_test_thread(void *user) {
 }
 
 void test_thread_local() {
-    int i;
+    size_t i;
     pthread_t threads[THREAD_LOCAL_THREADS];
     pthread_key_create(&thread_local_key, NULL);
     for (i = 0; i < THREAD_LOCAL_THREADS; i++) {
@@ -304,7 +306,70 @@ void test_thread_local() {
     }
 }
 
+typedef struct {
+    uint32_t val;
+} sl_test_t;
+
+int sl_compare(const void *a, const void *b) {
+    const sl_test_t *va = a, *vb = b;
+    return va->val - vb->val;
+}
+
+void sl_free_handler(ecr_skiplist_t *sl, void *value, void *user) {
+    free(value);
+}
+
+void test_skip_list() {
+    ecr_skiplist_t sl;
+    ecr_skiplist_iter_t iter;
+    ecr_skiplist_init(&sl, sl_compare);
+
+    int i, j, f = 0, r = 0, val;
+    sl_test_t *v, *old;
+    srandom(time(NULL));
+    for (i = 0; i < 10000; i++) {
+        for (j = 0; j < 10; j++) {
+            v = malloc(sizeof(sl_test_t));
+            v->val = random() % 1000;
+            old = ecr_skiplist_set(&sl, v);
+            if (old) {
+                assert(old->val == v->val);
+                free(old);
+                f++;
+            }
+        }
+        ecr_skiplist_iter_init(&iter, &sl);
+        val = v->val;
+        for (j = 0; j < val % 5 && (v = ecr_skiplist_iter_next(&iter)); j++) {
+            val = v->val;
+            old = ecr_skiplist_remove(&sl, v);
+            assert(old == v);
+            free(old);
+            r++;
+        }
+    }
+    printf("size: %lu, free: %d, remove: %d\n", ecr_skiplist_size(&sl), f, r);
+    ecr_skiplist_iter_init(&iter, &sl);
+    old = NULL;
+    while ((v = ecr_skiplist_iter_next(&iter))) {
+        if (old) {
+            assert(old->val <= v->val);
+        }
+        old = v;
+    }
+    ecr_skiplist_destroy(&sl, sl_free_handler, NULL);
+}
+
+void test_uint(int argc, char **argv) {
+    uint8_t a, b;
+    int8_t v;
+    a = (uint8_t) atoi(argv[1]);
+    b = (uint8_t) atoi(argv[2]);
+    v = a - b;
+    printf("a: %hhu, b: %hhu, a-b: %hhd\n", a, b, v);
+}
+
 int main(int argc, char **argv) {
-    test_thread_local();
+    test_uint(argc, argv);
     return EXIT_SUCCESS;
 }

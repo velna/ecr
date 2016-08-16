@@ -10,41 +10,9 @@
 #include <string.h>
 #include <stdlib.h>
 
-int ecr_fixedhash_ctx_init(ecr_fixedhash_ctx_t *ctx, const ecr_str_t* keys, int n) {
-    size_t i;
-    ecr_str_t *k;
-
-    ecr_hashmap_init(&ctx->key_map, n, 0);
-    ecr_list_init(&ctx->keys, n);
-    for (i = 0; i < n; i++) {
-        ecr_hashmap_put(&ctx->key_map, keys[i].ptr, keys[i].len, (void*) (i + 1));
-        k = malloc(sizeof(ecr_str_t));
-        k->ptr = malloc(keys[i].len);
-        memcpy(k->ptr, keys[i].ptr, keys[i].len);
-        k->len = keys[i].len;
-        ecr_list_add(&ctx->keys, k);
-    }
-    return 0;
-}
-
-int ecr_fixedhash_ctx_init_string(ecr_fixedhash_ctx_t *ctx, const char *keys) {
-    char *k, *ss = NULL, *str;
-    ecr_str_t *key;
-    size_t i = 0;
-
+int ecr_fixedhash_ctx_init(ecr_fixedhash_ctx_t *ctx) {
     ecr_list_init(&ctx->keys, 16);
     ecr_hashmap_init(&ctx->key_map, 16, HASHMAP_NOLOCK);
-    str = strdup(keys);
-    k = strtok_r(str, ", ", &ss);
-    while (k) {
-        key = malloc(sizeof(ecr_str_t));
-        key->ptr = strdup(k);
-        key->len = strlen(k);
-        ecr_hashmap_put(&ctx->key_map, key->ptr, key->len, (void*) (++i));
-        ecr_list_add(&ctx->keys, key);
-        k = strtok_r(NULL, ", ", &ss);
-    }
-    free(str);
     return 0;
 }
 
