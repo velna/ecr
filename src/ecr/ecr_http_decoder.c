@@ -314,8 +314,12 @@ int ecr_http_decode(ecr_http_message_t *message, char *ptr, size_t size) {
     } else if (message->decode_status == HTTP_DECODE_OK) {
         ecr_http_decode_err(message, HTTP_ERR_DONE)
         return HTTP_DECODE_ERR;
+    } else if (message->_chunk_used > message->decoder->max_content_chunks) {
+        ecr_http_decode_err(message, HTTP_ERR_OUT_OF_BUF)
+        return HTTP_DECODE_ERR;
     }
 
+    message->_chunk_used++;
     last_chunk = message->_chunks->tail;
     if (message->_chunk_left) {
         if (last_chunk) {

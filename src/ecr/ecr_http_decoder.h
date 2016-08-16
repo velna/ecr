@@ -159,6 +159,7 @@ typedef struct ecr_http_message_s {
     //private fields
     int8_t _status;
     int8_t _next_status;
+    int _chunk_used;
     int _content_buf_idx;
     int _buf_size;
     int _buf_idx;

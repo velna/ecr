@@ -24,6 +24,7 @@
 #include "ecr/ecr_macbind.h"
 #include "ecr/ecr_pcap.h"
 #include "ecr/ecr_radius.h"
+#include "ecr/ecr_rebalancer.h"
 #include "ecr/ecr_rollingfile.h"
 #include "ecr/ecr_server.h"
 #include "ecr/ecr_skiplist.h"
