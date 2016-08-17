@@ -105,7 +105,7 @@ inline size_t ecr_mem_cspn(const void *mem, size_t n, const char *stopset) {
 inline size_t ecr_mem_rcspn(const void *mem, size_t n, const char *stopset) {
     register size_t i;
     register const char *p, *s;
-    for (s = ((const char*) mem) + n, i = 0; i < n; s--, i++) {
+    for (s = ((const char*) mem) + n - 1, i = 0; i < n; s--, i++) {
         for (p = stopset; *p != 0; p++) {
             if (*s == *p) {
                 return s - (const char*) mem;
