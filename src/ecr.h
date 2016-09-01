@@ -30,6 +30,7 @@
 #include "ecr/ecr_skiplist.h"
 #include "ecr/ecr_tlv.h"
 #include "ecr/ecr_uncap.h"
+#include "ecr/ecr_urlmatch.h"
 #include "ecr/ecr_util.h"
 #include "ecr/ecr_wumanber.h"
 

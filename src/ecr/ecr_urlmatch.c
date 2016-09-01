@@ -1,0 +1,213 @@
+/*
+ * ecr_urlmatch.c
+ *
+ *  Created on: Aug 31, 2016
+ *      Author: dev
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "ecr_list.h"
+#include "ecr_urlmatch.h"
+
+ecr_urlmatch_t * ecr_urlmatch_new() {
+    ecr_hashmap_t * map = calloc(1, sizeof(ecr_hashmap_t));
+    ecr_hashmap_init(map, 16, 0);
+    return (ecr_urlmatch_t*) map;
+}
+
+static inline ecr_list_t * build_split_list(char * url) {
+    if (strncasecmp(url, "http://", 7) == 0) {
+        url += 7;
+    } else if (strncasecmp(url, "https://", 8) == 0) {
+        url += 8;
+    } else if (strncasecmp(url, "//", 2) == 0) {
+        url += 2;
+    }
+    url = strdup(url);
+
+    char * p;
+    ecr_list_t * split = ecr_list_new(8);
+    while ((p = strchr(url, '/'))) {
+        *p = 0;
+        ecr_list_add(split, url);
+        url = p + 1;
+    }
+    if (strlen(url) > 0) {
+        ecr_list_add(split, url);
+    }
+    return split;
+}
+
+static inline void free_split_list(ecr_list_t * split) {
+    if (!split) {
+        return;
+    }
+    if (ecr_list_size(split) > 0) {
+        free(ecr_list_get(split, 0));
+    }
+    ecr_list_destroy(split, NULL);
+}
+
+void ecr_urlmatch_addpattern(ecr_urlmatch_t * in, char * pattern) {
+    ecr_hashmap_t * map = in;
+
+    ecr_list_t * split = build_split_list(pattern);
+
+    int i, size = ecr_list_size(split);
+    char * str, *host = ecr_list_get(split, 0);
+    ecr_urlmatch_node_t head = { .next = NULL }, *next = NULL;
+    for (i = 1; i < size; i++) {
+        str = ecr_list_get(split, i);
+        if (strcmp(str, "*") == 0) {
+            continue;
+        }
+        if (!next) {
+            next = &head;
+        }
+        next = next->next = calloc(1, sizeof(ecr_urlmatch_node_t));
+        next->index = i;
+        next->str = strdup(str);
+
+        char *p;
+        if ((p = strchr(str, '*'))) {
+            if (p > str) {
+                next->prefix = calloc(1, sizeof(ecr_str_t));
+                next->prefix->len = p - str;
+                next->prefix->ptr = strndup(str, p - str);
+            }
+            if (strlen(p + 1) > 0) {
+                next->suffix = calloc(1, sizeof(ecr_str_t));
+                next->suffix->len = strlen(p + 1);
+                next->suffix->ptr = strdup(p + 1);
+            }
+        } else {
+            next->all = 1;
+        }
+    }
+
+    ecr_list_t * list;
+    if (!(list = ecr_hashmap_get(map, host, strlen(host)))) {
+        ecr_hashmap_put(map, host, strlen(host), list = ecr_list_new(8));
+    }
+
+    ecr_urlmatch_url_t * u = calloc(1, sizeof(ecr_urlmatch_url_t));
+    u->size = size;
+    u->str = strdup(pattern);
+    u->next = head.next;
+    ecr_list_add(list, u);
+
+    free_split_list(split);
+}
+
+void ecr_urlmatch_print(ecr_urlmatch_t * in, FILE* out) {
+    ecr_hashmap_iter_t it;
+    ecr_hashmap_iter_init(&it, (ecr_hashmap_t *) in);
+
+    int i;
+    ecr_str_t host;
+    ecr_list_t * list;
+    while (ecr_hashmap_iter_next(&it, (void **) &host.ptr, &host.len, (void **) &list) == 0) {
+        fprintf(out, "====[%.*s]===\n", (int) host.len, host.ptr);
+        for (i = 0; i < ecr_list_size(list); i++) {
+            ecr_urlmatch_url_t * u = ecr_list_get(list, i);
+            fprintf(out, "[size: %d]%s\n", u->size, u->str);
+            ecr_urlmatch_node_t * next = u->next;
+            while (next) {
+                fprintf(out, "i: %d, str: %s", next->index, next->str);
+                if (next->all) {
+                    fprintf(out, ", [all]");
+                }
+                if (next->prefix) {
+                    fprintf(out, ", [prefix: %s/%lu]", next->prefix->ptr, next->prefix->len);
+                }
+                if (next->suffix) {
+                    fprintf(out, ", [suffix: %s/%lu]", next->suffix->ptr, next->suffix->len);
+                }
+                fprintf(out, "\n");
+                next = next->next;
+            }
+            fprintf(out, "\n");
+        }
+    }
+}
+
+int ecr_urlmatch_match(ecr_urlmatch_t * in, char * url) {
+    ecr_hashmap_t * map = in;
+
+    ecr_list_t * split = build_split_list(url);
+    char * host = ecr_list_get(split, 0);
+
+    int ret = 0, i;
+    ecr_list_t * list = ecr_hashmap_get(map, host, strlen(host));
+    if (list) {
+        for (i = 0; i < ecr_list_size(list); i++) {
+            ecr_urlmatch_url_t * u = ecr_list_get(list, i);
+            if (u->size != ecr_list_size(split)) {
+                continue;
+            }
+            char ok = 1;
+            ecr_urlmatch_node_t *next = u->next;
+            while (next) {
+                char * v = ecr_list_get(split, next->index);
+                if (next->all && strcmp(v, next->str) != 0) {
+                    ok = 0;
+                    break;
+                }
+                if (next->prefix) {
+                    if (strncmp(v, next->prefix->ptr, next->prefix->len) != 0) {
+                        ok = 0;
+                        break;
+                    }
+                }
+                if (next->suffix) {
+                    if (strncmp(v + (strlen(v) - next->suffix->len), next->suffix->ptr, next->suffix->len) != 0) {
+                        ok = 0;
+                        break;
+                    }
+                }
+                next = next->next;
+            }
+            if (ok) {
+                ret = 1;
+                break;
+            }
+        }
+    }
+
+    free_split_list(split);
+
+    return ret;
+}
+
+static void ecr_urlmatch_url_handler(ecr_list_t *list, int i, void* value) {
+    ecr_urlmatch_url_t * u = value;
+    ecr_urlmatch_node_t * next = u->next, *nnext;
+    while (next) {
+        free(next->str);
+        if (next->prefix) {
+            free(next->prefix->ptr);
+            free(next->prefix);
+        }
+        if (next->suffix) {
+            free(next->suffix->ptr);
+            free(next->suffix);
+        }
+        nnext = next->next;
+        free(next);
+        next = nnext;
+    }
+    free(u->str);
+    free(u);
+}
+
+static void ecr_urlmatch_handler(ecr_hashmap_t *map, void *key, size_t key_size, void *value) {
+    ecr_list_destroy((ecr_list_t*) value, ecr_urlmatch_url_handler);
+}
+
+void ecr_urlmatch_destroy(ecr_urlmatch_t * in) {
+    ecr_hashmap_destroy((ecr_hashmap_t *) in, ecr_urlmatch_handler);
+    free(in);
+}

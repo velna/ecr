@@ -37,6 +37,7 @@ nobase_include_HEADERS = ecr.h ecrconf.h \
 	ecr/ecr_skiplist.h \
 	ecr/ecr_tlv.h \
 	ecr/ecr_uncap.h \
+	ecr/ecr_urlmatch.h \
 	ecr/ecr_util.h \
 	ecr/ecr_wumanber.h
 
@@ -74,6 +75,7 @@ libecr_la_SOURCES = \
 	ecr/ecr_skiplist.c \
 	ecr/ecr_tlv.c \
 	ecr/ecr_uncap.c \
+	ecr/ecr_urlmatch.c \
 	ecr/ecr_util.c \
 	ecr/ecr_util_base64.c \
 	ecr/ecr_util_hash.c \
