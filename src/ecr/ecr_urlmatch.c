@@ -23,12 +23,19 @@ static inline ecr_list_t * build_split_list(char * url) {
         url += 7;
     } else if (strncasecmp(url, "https://", 8) == 0) {
         url += 8;
-    } else if (strncasecmp(url, "//", 2) == 0) {
+    } else if (strncmp(url, "//", 2) == 0) {
         url += 2;
     }
     url = strdup(url);
 
     char * p;
+    if ((p = strchr(url, '?'))) {
+        *p = 0;
+    }
+    if ((p = strchr(url, '#'))) {
+        *p = 0;
+    }
+
     ecr_list_t * split = ecr_list_new(8);
     while ((p = strchr(url, '/'))) {
         *p = 0;
@@ -37,6 +44,9 @@ static inline ecr_list_t * build_split_list(char * url) {
     }
     if (strlen(url) > 0) {
         ecr_list_add(split, url);
+    }
+    if (ecr_list_size(split) == 0) {
+        free(url);
     }
     return split;
 }
@@ -53,11 +63,16 @@ static inline void free_split_list(ecr_list_t * split) {
 
 void ecr_urlmatch_addpattern(ecr_urlmatch_t * in, char * pattern) {
     ecr_hashmap_t * map = in;
+    int i, size;
+    char * str, *host;
 
     ecr_list_t * split = build_split_list(pattern);
+    if ((size = ecr_list_size(split)) == 0) {
+        free_split_list(split);
+        return;
+    }
 
-    int i, size = ecr_list_size(split);
-    char * str, *host = ecr_list_get(split, 0);
+    host = ecr_list_get(split, 0);
     ecr_urlmatch_node_t head = { .next = NULL }, *next = NULL;
     for (i = 1; i < size; i++) {
         str = ecr_list_get(split, i);
@@ -137,15 +152,21 @@ void ecr_urlmatch_print(ecr_urlmatch_t * in, FILE* out) {
 int ecr_urlmatch_match(ecr_urlmatch_t * in, char * url) {
     ecr_hashmap_t * map = in;
 
-    ecr_list_t * split = build_split_list(url);
-    char * host = ecr_list_get(split, 0);
+    int ret = 0, i, size;
+    char * host;
 
-    int ret = 0, i;
+    ecr_list_t * split = build_split_list(url);
+    if ((size = ecr_list_size(split)) == 0) {
+        free_split_list(split);
+        return ret;
+    }
+    host = ecr_list_get(split, 0);
+
     ecr_list_t * list = ecr_hashmap_get(map, host, strlen(host));
     if (list) {
         for (i = 0; i < ecr_list_size(list); i++) {
             ecr_urlmatch_url_t * u = ecr_list_get(list, i);
-            if (u->size != ecr_list_size(split)) {
+            if (u->size != size) {
                 continue;
             }
             char ok = 1;
