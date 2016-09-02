@@ -38,6 +38,7 @@ typedef struct {
         } kafka;
     };
     const char *format;
+    ecr_config_t *config;
 } ecr_pub_output_config_t;
 
 typedef struct ecr_pub_output_s {
@@ -59,8 +60,6 @@ typedef struct ecr_pub_output_s {
         } file;
         struct {
             int new;
-            rd_kafka_conf_t *conf;
-            rd_kafka_topic_conf_t *topic_conf;
             rd_kafka_t *kafka;
             rd_kafka_topic_t *topic;
         } kafka;
@@ -103,7 +102,7 @@ int ecr_pub_init(ecr_pub_t *pub, const char *id, ecr_pub_config_t *config);
 
 int ecr_pub_output_config(ecr_pub_t *pub, ecr_config_t *config);
 
-int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *config);
+int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *output_config, ecr_config_t *config);
 
 void ecr_pub(ecr_pub_t *pub, void *data, int tid);
 

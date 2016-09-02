@@ -10,6 +10,7 @@
 #include "ecr_logger.h"
 #include "ecr_util.h"
 #include "ecr_getopt.h"
+#include "ecr_kafka.h"
 #include <unistd.h>
 #include <assert.h>
 #include <string.h>
@@ -62,10 +63,6 @@ static void * ecr_app_signal_routine(void *user) {
 static void ecr_app_mongo_log_handler(mongoc_log_level_t log_level, const char *log_domain, const char *message,
         void *user_data) {
     L_INFO("%s: %s", log_domain, message);
-}
-
-static void ecr_app_kafka_logger(const rd_kafka_t *rk, int level, const char *fac, const char *buf) {
-    L_LOG(level, "%s: %s", rd_kafka_name(rk), buf);
 }
 
 int ecr_app_init(ecr_app_t *app, int argc, char **argv) {
@@ -205,20 +202,9 @@ int ecr_app_init(ecr_app_t *app, int argc, char **argv) {
 
     // init kafka
     if (app->config.kafka_brokers) {
-        rd_kafka_conf_t *conf = rd_kafka_conf_new();
-        char errstr[512];
-        app->kafka = rd_kafka_new(RD_KAFKA_PRODUCER, conf, errstr, sizeof(errstr));
-        rd_kafka_conf_destroy(conf);
+        app->kafka = ecr_kafka_new_producer(app->config.kafka_brokers, "app.kafka", &app->config_props);
         if (!app->kafka) {
-            L_ERROR("error init kafka: %s", errstr);
-            return -1;
-        }
-        rd_kafka_set_logger(app->kafka, ecr_app_kafka_logger);
-        rd_kafka_set_log_level(app->kafka, LOG_INFO);
-
-        if (rd_kafka_brokers_add(app->kafka, app->config.kafka_brokers) == 0) {
-            L_ERROR("error add kafka brokers %s: %s", app->config.kafka_brokers,
-                    rd_kafka_err2str(rd_kafka_errno2err(errno)));
+            L_ERROR("error init kafka.");
             return -1;
         }
         L_INFO("kafka brokers connected at %s", app->config.kafka_brokers);

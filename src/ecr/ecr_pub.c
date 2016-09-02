@@ -9,6 +9,7 @@
 #include "ecr_pub.h"
 #include "ecr_util.h"
 #include "ecr_logger.h"
+#include "ecr_kafka.h"
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -49,45 +50,41 @@ int ecr_pub_output_config(ecr_pub_t *pub, ecr_config_t *config) {
 
     ecr_config_load(config, pub->id, config_lines);
     if (file_config.format && file_config.file.name) {
-        if (ecr_pub_output_add(pub, &file_config)) {
+        if (ecr_pub_output_add(pub, &file_config, config)) {
             error++;
         } else {
             ok++;
         }
     }
     if (zmq_config.format && zmq_config.zmq.endpoint) {
-        if (ecr_pub_output_add(pub, &zmq_config)) {
+        if (ecr_pub_output_add(pub, &zmq_config, config)) {
             error++;
         } else {
             ok++;
         }
     }
     if (kafka_config.format && kafka_config.kafka.topic) {
-        if (ecr_pub_output_add(pub, &kafka_config)) {
+        if (ecr_pub_output_add(pub, &kafka_config, config)) {
             error++;
         } else {
             ok++;
         }
     }
     if (!ok) {
-        if (ecr_pub_output_add(pub, &stat_config)) {
+        if (ecr_pub_output_add(pub, &stat_config, config)) {
             error++;
         }
     }
     return error ? -1 : 0;
 }
 
-static void ecr_pub_kafka_logger(const rd_kafka_t *rk, int level, const char *fac, const char *buf) {
-    L_LOG(level, "%s: %s", rd_kafka_name(rk), buf);
-}
-
-int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *config) {
+int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *output_config, ecr_config_t *config) {
     ecr_pub_output_t *output = calloc(1, sizeof(ecr_pub_output_t));
     int i, j;
-    char *fp, *s, errstr[512];
+    char *fp, *s, errstr[512], *id;
     FILE *file;
 
-    switch (config->type) {
+    switch (output_config->type) {
     case ECR_PUB_STAT:
         output->total = ecr_counter_create(pub->config.cctx, pub->id, "stat_ok", 0);
         output->total_bytes = ecr_counter_create(pub->config.cctx, pub->id, "stat_bytes", 0);
@@ -99,24 +96,24 @@ int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *config) {
             free(output);
             return -1;
         }
-        output->zmq.skt = ecr_zmq_init(config->zmq.endpoint, config->zmq.options, pub->config.zmq_ctx);
+        output->zmq.skt = ecr_zmq_init(output_config->zmq.endpoint, output_config->zmq.options, pub->config.zmq_ctx);
         if (!output->zmq.skt) {
-            L_ERROR("%s: error init zmq file %s[%s]", pub->id, config->zmq.endpoint, config->zmq.options);
+            L_ERROR("%s: error init zmq file %s[%s]", pub->id, output_config->zmq.endpoint, output_config->zmq.options);
             free(output);
             return -1;
         }
         pthread_mutex_init(&output->zmq.lock, NULL);
         output->total = ecr_counter_create(pub->config.cctx, pub->id, "zmq_ok", 0);
         output->total_bytes = ecr_counter_create(pub->config.cctx, pub->id, "zmq_bytes", 0);
-        L_INFO("%s: add zmq output: %s[%s].", pub->id, config->zmq.endpoint, config->zmq.options);
+        L_INFO("%s: add zmq output: %s[%s].", pub->id, output_config->zmq.endpoint, output_config->zmq.options);
         break;
     case ECR_PUB_FILE:
-        output->file.split = config->file.split <= 0 ? 1 : config->file.split;
+        output->file.split = output_config->file.split <= 0 ? 1 : output_config->file.split;
         output->file.idx_array = calloc(pub->config.num_threads, sizeof(int));
         output->file.array = calloc(pub->config.num_threads * output->file.split, sizeof(FILE *));
         for (i = 0; i < pub->config.num_threads; i++) {
             for (j = 0; j < output->file.split; j++) {
-                fp = strdup(config->file.name);
+                fp = strdup(output_config->file.name);
                 s = fp;
                 while (*s) {
                     if (*s == '#') {
@@ -128,7 +125,7 @@ int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *config) {
                         pub->config.io_regs);
                 free(fp);
                 if (!file) {
-                    L_ERROR("%s: error init rolling file %s", pub->id, config->file.name);
+                    L_ERROR("%s: error init rolling file %s", pub->id, output_config->file.name);
                     for (i = 0; i < pub->config.num_threads; i++) {
                         for (j = 0; j < output->file.split; j++) {
                             if ((file = output->file.array[i * output->file.split + j])) {
@@ -144,25 +141,18 @@ int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *config) {
         }
         output->total = ecr_counter_create(pub->config.cctx, pub->id, "file_ok", 0);
         output->total_bytes = ecr_counter_create(pub->config.cctx, pub->id, "file_bytes", 0);
-        L_INFO("%s: add file output: %s[%d].", pub->id, config->file.name, config->file.split);
+        L_INFO("%s: add file output: %s[%d].", pub->id, output_config->file.name, output_config->file.split);
         break;
     case ECR_PUB_KAFKA:
-        if (config->kafka.brokers) {
+        asprintf(&id, "%s.kafka", pub->id);
+        if (output_config->kafka.brokers) {
             output->kafka.new = 1;
-            output->kafka.conf = rd_kafka_conf_new();
-            output->kafka.kafka = rd_kafka_new(RD_KAFKA_PRODUCER, output->kafka.conf, errstr, sizeof(errstr));
+            output->kafka.kafka = ecr_kafka_new_producer(output_config->kafka.brokers, id, config);
             if (!output->kafka.kafka) {
-                L_ERROR("%s: error init kafka file %s@%s, %s", pub->id, config->kafka.topic, config->kafka.brokers,
-                        errstr);
+                L_ERROR("%s: error init kafka file %s@%s, %s", pub->id, output_config->kafka.topic,
+                        output_config->kafka.brokers, errstr);
                 free(output);
-                return -1;
-            }
-            rd_kafka_set_logger(output->kafka.kafka, ecr_pub_kafka_logger);
-            rd_kafka_set_log_level(output->kafka.kafka, LOG_INFO);
-
-            if (rd_kafka_brokers_add(output->kafka.kafka, config->kafka.brokers) == 0) {
-                L_ERROR("%s: error init kafka file %s@%s", pub->id, config->kafka.topic, config->kafka.brokers);
-                free(output);
+                free(id);
                 return -1;
             }
         } else {
@@ -170,41 +160,44 @@ int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *config) {
             if (!output->kafka.kafka) {
                 L_ERROR(
                         "%s: error init kafka file %s@%s, no broker configured and no system default kafka is configured.",
-                        pub->id, config->kafka.topic, config->kafka.brokers);
+                        pub->id, output_config->kafka.topic, output_config->kafka.brokers);
                 free(output);
+                free(id);
                 return -1;
             }
         }
 
-        output->kafka.topic_conf = rd_kafka_topic_conf_new();
-        output->kafka.topic = rd_kafka_topic_new(output->kafka.kafka, config->kafka.topic, output->kafka.topic_conf);
+        output->kafka.topic = ecr_kafka_new_topic(output->kafka.kafka, id, output_config->kafka.topic, config);
         if (!output->kafka.topic) {
-            L_ERROR("%s: error init kafka file %s@%s, Failed to create new topic: %s", pub->id, config->kafka.topic,
-                    config->kafka.brokers, rd_kafka_err2str(rd_kafka_errno2err(errno)));
+            L_ERROR("%s: error init kafka file %s@%s, Failed to create new topic: %s", pub->id,
+                    output_config->kafka.topic, output_config->kafka.brokers,
+                    rd_kafka_err2str(rd_kafka_errno2err(errno)));
             free(output);
+            free(id);
             return -1;
         }
         output->total = ecr_counter_create(pub->config.cctx, pub->id, "kafka_ok", 0);
         output->total_bytes = ecr_counter_create(pub->config.cctx, pub->id, "kafka_bytes", 0);
-        L_INFO("%s: add kafka output: %s@%s.", pub->id, config->kafka.topic, config->kafka.brokers);
+        L_INFO("%s: add kafka output: %s@%s.", pub->id, output_config->kafka.topic, output_config->kafka.brokers);
+        free(id);
         break;
     default:
-        L_ERROR("%s: unknown pub type: %d", pub->id, config->type);
+        L_ERROR("%s: unknown pub type: %d", pub->id, output_config->type);
         free(output);
         return -1;
     }
-    output->type = config->type;
+    output->type = output_config->type;
     output->codec = ECR_PUB_CODEC_NONE;
-    if (config->format) {
+    if (output_config->format) {
         if (pub->config.codecs) {
-            size_t off = strspn(config->format, "abcdefghijklmnopqrstuvwxyz0123456789");
-            if (off && config->format[off] == ':') {
-                char *codec_name = strndup(config->format, off);
+            size_t off = strspn(output_config->format, "abcdefghijklmnopqrstuvwxyz0123456789");
+            if (off && output_config->format[off] == ':') {
+                char *codec_name = strndup(output_config->format, off);
                 i = 0;
                 while (pub->config.codecs[i].name) {
                     if (strcmp(codec_name, pub->config.codecs[i].name) == 0) {
                         output->codec = pub->config.codecs[i].codec;
-                        output->format = strdup(config->format + off + 1);
+                        output->format = strdup(output_config->format + off + 1);
                         break;
                     }
                     i++;
@@ -213,7 +206,7 @@ int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *config) {
             }
         }
         if (!output->format) {
-            output->format = strdup(config->format);
+            output->format = strdup(output_config->format);
         }
     }
     if (pub->config.output_init_cb) {
