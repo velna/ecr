@@ -46,8 +46,10 @@ typedef struct ecr_pub_output_s {
     int codec;
     char *format;
     void *user;
-    ecr_counter_t *total;
-    ecr_counter_t *total_bytes;
+    ecr_counter_t *ok;
+    ecr_counter_t *error;
+    ecr_counter_t *bytes_ok;
+    ecr_counter_t *bytes_error;
     union {
         struct {
             void *skt;

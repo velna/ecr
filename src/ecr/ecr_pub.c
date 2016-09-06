@@ -86,8 +86,10 @@ int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *output_config, e
 
     switch (output_config->type) {
     case ECR_PUB_STAT:
-        output->total = ecr_counter_create(pub->config.cctx, pub->id, "stat_ok", 0);
-        output->total_bytes = ecr_counter_create(pub->config.cctx, pub->id, "stat_bytes", 0);
+        output->ok = ecr_counter_create(pub->config.cctx, pub->id, "stat_ok", 0);
+        output->error = ecr_counter_create(pub->config.cctx, pub->id, "stat_error", 0);
+        output->bytes_ok = ecr_counter_create(pub->config.cctx, pub->id, "stat_bytes_ok", 0);
+        output->bytes_error = ecr_counter_create(pub->config.cctx, pub->id, "stat_bytes_error", 0);
         L_INFO("%s: add stat only output.", pub->id);
         break;
     case ECR_PUB_ZMQ:
@@ -103,8 +105,10 @@ int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *output_config, e
             return -1;
         }
         pthread_mutex_init(&output->zmq.lock, NULL);
-        output->total = ecr_counter_create(pub->config.cctx, pub->id, "zmq_ok", 0);
-        output->total_bytes = ecr_counter_create(pub->config.cctx, pub->id, "zmq_bytes", 0);
+        output->ok = ecr_counter_create(pub->config.cctx, pub->id, "zmq_ok", 0);
+        output->error = ecr_counter_create(pub->config.cctx, pub->id, "zmq_error", 0);
+        output->bytes_ok = ecr_counter_create(pub->config.cctx, pub->id, "zmq_bytes_ok", 0);
+        output->bytes_error = ecr_counter_create(pub->config.cctx, pub->id, "zmq_bytes_error", 0);
         L_INFO("%s: add zmq output: %s[%s].", pub->id, output_config->zmq.endpoint, output_config->zmq.options);
         break;
     case ECR_PUB_FILE:
@@ -139,8 +143,10 @@ int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *output_config, e
                 }
             }
         }
-        output->total = ecr_counter_create(pub->config.cctx, pub->id, "file_ok", 0);
-        output->total_bytes = ecr_counter_create(pub->config.cctx, pub->id, "file_bytes", 0);
+        output->ok = ecr_counter_create(pub->config.cctx, pub->id, "file_ok", 0);
+        output->error = ecr_counter_create(pub->config.cctx, pub->id, "file_error", 0);
+        output->bytes_ok = ecr_counter_create(pub->config.cctx, pub->id, "file_bytes_ok", 0);
+        output->bytes_error = ecr_counter_create(pub->config.cctx, pub->id, "file_bytes_error", 0);
         L_INFO("%s: add file output: %s[%d].", pub->id, output_config->file.name, output_config->file.split);
         break;
     case ECR_PUB_KAFKA:
@@ -176,8 +182,10 @@ int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *output_config, e
             free(id);
             return -1;
         }
-        output->total = ecr_counter_create(pub->config.cctx, pub->id, "kafka_ok", 0);
-        output->total_bytes = ecr_counter_create(pub->config.cctx, pub->id, "kafka_bytes", 0);
+        output->ok = ecr_counter_create(pub->config.cctx, pub->id, "kafka_ok", 0);
+        output->error = ecr_counter_create(pub->config.cctx, pub->id, "kafka_error", 0);
+        output->bytes_ok = ecr_counter_create(pub->config.cctx, pub->id, "kafka_bytes_ok", 0);
+        output->bytes_error = ecr_counter_create(pub->config.cctx, pub->id, "kafka_bytes_error", 0);
         L_INFO("%s: add kafka output: %s@%s.", pub->id, output_config->kafka.topic, output_config->kafka.brokers);
         free(id);
         break;
@@ -221,9 +229,10 @@ void ecr_pub(ecr_pub_t *pub, void *data, int tid) {
     ecr_pub_output_t *output = pub->outputs;
     ecr_str_t *buf = &pub->buf_array[tid];
     FILE *stream = pub->stream_array[tid];
+    int ok;
 
     while (output) {
-        ecr_counter_incr(output->total);
+        ok = 1;
         if (output->type != ECR_PUB_STAT) {
             rewind(stream);
             pub->config.write_cb(pub, output, stream, data, tid);
@@ -231,26 +240,33 @@ void ecr_pub(ecr_pub_t *pub, void *data, int tid) {
             switch (output->type) {
             case ECR_PUB_ZMQ:
                 pthread_mutex_lock(&output->zmq.lock);
-                zmq_send(output->zmq.skt, buf->ptr, buf->len, ZMQ_DONTWAIT);
+                if (zmq_send(output->zmq.skt, buf->ptr, buf->len, ZMQ_DONTWAIT) == -1) {
+                    ok = 0;
+                }
                 pthread_mutex_unlock(&output->zmq.lock);
                 break;
             case ECR_PUB_FILE:
-                fwrite(buf->ptr, buf->len, 1,
-                        output->file.array[tid * output->file.split + output->file.idx_array[tid]]);
+                if (fwrite(buf->ptr, buf->len, 1,
+                        output->file.array[tid * output->file.split + output->file.idx_array[tid]]) != 1) {
+                    ok = 0;
+                }
                 if (++output->file.idx_array[tid] == output->file.split) {
                     output->file.idx_array[tid] = 0;
                 }
                 break;
             case ECR_PUB_KAFKA:
-                rd_kafka_produce(output->kafka.topic, RD_KAFKA_PARTITION_UA, RD_KAFKA_MSG_F_COPY, buf->ptr, buf->len,
-                        (NULL), 0, (NULL));
+                if (rd_kafka_produce(output->kafka.topic, RD_KAFKA_PARTITION_UA, RD_KAFKA_MSG_F_COPY, buf->ptr,
+                        buf->len, (NULL), 0, (NULL))) {
+                    ok = 0;
+                }
                 rd_kafka_poll(output->kafka.kafka, 0);
                 break;
             default:
                 break;
             }
-            ecr_counter_add(output->total_bytes, buf->len);
+            ecr_counter_add(ok ? output->bytes_ok : output->bytes_error, buf->len);
         }
+        ecr_counter_incr(ok ? output->ok : output->error);
         output = output->next;
     }
 }
