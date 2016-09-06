@@ -17,15 +17,8 @@ int ecr_urlmatch_init(ecr_urlmatch_t * in) {
     return 0;
 }
 
-static inline ecr_list_t * build_split_list(char * url) {
-    if (strncasecmp(url, "http://", 7) == 0) {
-        url += 7;
-    } else if (strncasecmp(url, "https://", 8) == 0) {
-        url += 8;
-    } else if (strncmp(url, "//", 2) == 0) {
-        url += 2;
-    }
-    url = strdup(url);
+static inline ecr_list_t * build_split_list(ecr_str_t * in) {
+    char * url = strndup(in->ptr, in->len);
 
     char * p;
     if ((p = strchr(url, '?'))) {
@@ -60,7 +53,7 @@ static inline void free_split_list(ecr_list_t * split) {
     ecr_list_destroy(split, NULL);
 }
 
-void ecr_urlmatch_addpattern(ecr_urlmatch_t * in, char * pattern) {
+void ecr_urlmatch_addpattern(ecr_urlmatch_t * in, ecr_str_t * pattern) {
     ecr_hashmap_t * map = in;
     int i, size;
     char * str, *host;
@@ -109,7 +102,7 @@ void ecr_urlmatch_addpattern(ecr_urlmatch_t * in, char * pattern) {
 
     ecr_urlmatch_url_t * u = calloc(1, sizeof(ecr_urlmatch_url_t));
     u->size = size;
-    u->str = strdup(pattern);
+    u->str = strndup(pattern->ptr, pattern->len);
     u->next = head.next;
     ecr_list_add(list, u);
 
@@ -148,7 +141,7 @@ void ecr_urlmatch_print(ecr_urlmatch_t * in, FILE* out) {
     }
 }
 
-int ecr_urlmatch_match(ecr_urlmatch_t * in, char * url) {
+int ecr_urlmatch_match(ecr_urlmatch_t * in, ecr_str_t * url) {
     ecr_hashmap_t * map = in;
 
     int ret = 0, i, size;
@@ -233,5 +226,4 @@ void ecr_urlmatch_clear(ecr_urlmatch_t * in) {
 
 void ecr_urlmatch_destroy(ecr_urlmatch_t * in) {
     ecr_hashmap_destroy((ecr_hashmap_t *) in, ecr_urlmatch_handler);
-    free(in);
 }

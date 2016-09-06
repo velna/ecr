@@ -29,11 +29,11 @@ typedef struct {
 
 int ecr_urlmatch_init(ecr_urlmatch_t * in);
 
-void ecr_urlmatch_addpattern(ecr_urlmatch_t * in, char * pattern);
+void ecr_urlmatch_addpattern(ecr_urlmatch_t * in, ecr_str_t * pattern);
 
 void ecr_urlmatch_print(ecr_urlmatch_t * in, FILE* out);
 
-int ecr_urlmatch_match(ecr_urlmatch_t * in, char * url);
+int ecr_urlmatch_match(ecr_urlmatch_t * in, ecr_str_t * url);
 
 void ecr_urlmatch_clear(ecr_urlmatch_t * in);
 

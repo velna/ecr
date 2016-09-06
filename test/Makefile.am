@@ -13,7 +13,7 @@ ecr_test_LDADD		= \
 	/usr/local/lib/libpcap.a \
 	/usr/local/lib/liblzo2.a
 
-ecr_test_LDFLAGS	=-lpthread -latomic_ops -lrt -lcrypto -lstdc++ -lssl
+ecr_test_LDFLAGS	=-lpthread -latomic_ops -lrt -lcrypto -lstdc++ -lssl -lsasl2
 
 
 run_test_SOURCES	= \
@@ -33,4 +33,4 @@ run_test_LDADD		= \
 	/usr/local/lib/libcunit.a
 
 run_test_LDFLAGS	= \
-	-lpthread -latomic_ops -lrt -lcrypto -lstdc++ -lssl -lcurses
+	-lpthread -latomic_ops -lrt -lcrypto -lstdc++ -lssl -lcurses -lsasl2
