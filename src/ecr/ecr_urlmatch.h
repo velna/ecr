@@ -27,13 +27,15 @@ typedef struct {
     ecr_urlmatch_node_t * next;
 } ecr_urlmatch_url_t;
 
-ecr_urlmatch_t * ecr_urlmatch_new();
+int ecr_urlmatch_init(ecr_urlmatch_t * in);
 
 void ecr_urlmatch_addpattern(ecr_urlmatch_t * in, char * pattern);
 
 void ecr_urlmatch_print(ecr_urlmatch_t * in, FILE* out);
 
 int ecr_urlmatch_match(ecr_urlmatch_t * in, char * url);
+
+void ecr_urlmatch_clear(ecr_urlmatch_t * in);
 
 void ecr_urlmatch_destroy(ecr_urlmatch_t * in);
 

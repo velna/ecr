@@ -12,10 +12,9 @@
 #include "ecr_list.h"
 #include "ecr_urlmatch.h"
 
-ecr_urlmatch_t * ecr_urlmatch_new() {
-    ecr_hashmap_t * map = calloc(1, sizeof(ecr_hashmap_t));
-    ecr_hashmap_init(map, 16, 0);
-    return (ecr_urlmatch_t*) map;
+int ecr_urlmatch_init(ecr_urlmatch_t * in) {
+    ecr_hashmap_init((ecr_hashmap_t *) in, 16, 0);
+    return 0;
 }
 
 static inline ecr_list_t * build_split_list(char * url) {
@@ -226,6 +225,10 @@ static void ecr_urlmatch_url_handler(ecr_list_t *list, int i, void* value) {
 
 static void ecr_urlmatch_handler(ecr_hashmap_t *map, void *key, size_t key_size, void *value) {
     ecr_list_destroy((ecr_list_t*) value, ecr_urlmatch_url_handler);
+}
+
+void ecr_urlmatch_clear(ecr_urlmatch_t * in) {
+    ecr_hashmap_clear((ecr_hashmap_t *) in, ecr_urlmatch_handler);
 }
 
 void ecr_urlmatch_destroy(ecr_urlmatch_t * in) {
