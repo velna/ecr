@@ -137,7 +137,6 @@ static rd_kafka_t* ecr_kafka_new(rd_kafka_type_t type, const char *brokers, cons
         L_ERROR("invalid brokers[%s]: %s", brokers, rd_kafka_err2str(rd_kafka_last_error()));
         goto error;
     }
-    rd_kafka_conf_destroy(conf);
     return kafka;
 
     error: {
@@ -187,7 +186,6 @@ rd_kafka_topic_t * ecr_kafka_new_topic(rd_kafka_t *kafka, const char *id, const 
         L_ERROR("error create topic [%s]: %s", topic_name, rd_kafka_err2str(rd_kafka_last_error()));
         goto error;
     }
-    rd_kafka_topic_conf_destroy(topic_conf);
     return topic;
 
     error: {

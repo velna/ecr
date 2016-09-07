@@ -10,6 +10,7 @@ ecr_test_LDADD		= \
 	/usr/local/lib/libmongoc-1.0.a \
 	/usr/local/lib/libbson-1.0.a \
 	/usr/local/lib/libz.a \
+	/usr/local/lib/librdkafka.a \
 	/usr/local/lib/libpcap.a \
 	/usr/local/lib/liblzo2.a
 
