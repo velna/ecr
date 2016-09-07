@@ -45,8 +45,9 @@ static void ecr_kafka_logger(const rd_kafka_t *rk, int level, const char *fac, c
 static rd_kafka_t* ecr_kafka_new(rd_kafka_type_t type, const char *brokers, const char *id, ecr_config_t *config) {
     rd_kafka_conf_t *conf = rd_kafka_conf_new();
     rd_kafka_t *kafka;
-    char errstr[512];
+    char errstr[512], thread_name[255];
 
+    ecr_get_thread_name(thread_name);
 #define CONF_SET(name) \
     if (ecr_kafka_conf_set(conf, name, id, config)) { \
         goto error; \
@@ -127,6 +128,7 @@ static rd_kafka_t* ecr_kafka_new(rd_kafka_type_t type, const char *brokers, cons
     CONF_SET("delivery.report.only.error")
 #undef CONF_SET
     rd_kafka_conf_set_log_cb(conf, ecr_kafka_logger);
+    ecr_set_thread_name("kafka");
     kafka = rd_kafka_new(type, conf, errstr, sizeof(errstr));
     if (!kafka) {
         L_ERROR("error create producer: %s", errstr);
@@ -137,10 +139,12 @@ static rd_kafka_t* ecr_kafka_new(rd_kafka_type_t type, const char *brokers, cons
         L_ERROR("invalid brokers[%s]: %s", brokers, rd_kafka_err2str(rd_kafka_last_error()));
         goto error;
     }
+    ecr_set_thread_name(thread_name);
     return kafka;
 
     error: {
         rd_kafka_conf_destroy(conf);
+        ecr_set_thread_name(thread_name);
         return NULL;
     }
 }

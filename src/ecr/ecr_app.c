@@ -70,6 +70,7 @@ int ecr_app_init(ecr_app_t *app, int argc, char **argv) {
     struct tm stm;
     pthread_attr_t attr;
     pthread_t thread;
+    char thread_name[255];
 
     ecr_config_line_t app_config_lines[] = {
     //
@@ -90,6 +91,8 @@ int ecr_app_init(ecr_app_t *app, int argc, char **argv) {
     memset(app, 0, sizeof(ecr_app_t));
     app->argc = argc;
     app->argv = argv;
+
+    ecr_get_thread_name(thread_name);
 
     ecr_getopt_data_t getopt_data = ECR_GETOPT_DATA_INITIALIZER;
     while ((opt = ecr_getopt(argc, argv, "c:", &getopt_data)) != -1) {
@@ -173,26 +176,31 @@ int ecr_app_init(ecr_app_t *app, int argc, char **argv) {
     ecr_counter_ctx_init(&app->counter_ctx);
 
     // init cmd
+    ecr_set_thread_name("zmq");
     app->zmq_ctx = zmq_ctx_new();
     zmq_ctx_set(app->zmq_ctx, ZMQ_IO_THREADS, app->config.zmq_io_thread_count);
     if (app->config.cmd_zmq_bind) {
         if (ecr_cmd_ctx_init(&app->cmd_ctx, app->zmq_ctx, app->config.cmd_zmq_bind) == 0) {
             ecr_cmd_register(&app->cmd_ctx, "sys", ecr_sys_cmd_handler, "system control commands.");
         } else {
+            ecr_set_thread_name(thread_name);
             L_ERROR("cmd zmq init error, bind at: %s.", app->config.cmd_zmq_bind);
             return -1;
         }
     } else {
         L_WARN("cmd zmq is not configured.");
     }
+    ecr_set_thread_name(thread_name);
 
     // init mongo
     if (app->config.mongo_uri) {
+        ecr_set_thread_name("mongo");
         mongoc_init();
         mongoc_log_set_handler(ecr_app_mongo_log_handler, NULL);
         mongoc_uri_t *uri = mongoc_uri_new(app->config.mongo_uri);
         app->mongo_pool = mongoc_client_pool_new(uri);
         mongoc_uri_destroy(uri);
+        ecr_set_thread_name(thread_name);
         if (!app->mongo_pool) {
             L_ERROR("mongo connect field at %s", app->config.mongo_uri);
             return -1;
