@@ -370,27 +370,35 @@ void test_uint(int argc, char **argv) {
 }
 
 void test_urlmatch(int argc, char ** argv) {
-    ecr_urlmatch_t * m = ecr_urlmatch_new();
+    ecr_urlmatch_t m;
+    ecr_urlmatch_init(&m);
 
     int i;
+    ecr_str_t pattern;
     for (i = 1; i < argc - 1; i++) {
-        ecr_urlmatch_addpattern(m, argv[i]);
+        pattern.ptr = argv[i];
+        pattern.len = strlen(pattern.ptr);
+        ecr_urlmatch_addpattern(&m, &pattern);
     }
 
-    ecr_urlmatch_print(m, stdout);
+    ecr_urlmatch_print(&m, stdout);
 
     int rc = -1, n = 10000;
 
+    ecr_str_t path;
+    path.ptr = argv[argc - 1];
+    path.len = (path.ptr);
+
     u_int64_t start = ecr_current_time();
     for (i = 0; i < n; i++) {
-        rc = ecr_urlmatch_match(m, argv[argc - 1]);
+        rc = ecr_urlmatch_match(&m, &path);
     }
     u_int64_t end = ecr_current_time();
 
     printf("rc: %d on %s\n", rc, argv[argc - 1]);
     printf("%d times within %lu ms\n", n, end - start);
 
-    ecr_urlmatch_destroy(m);
+    ecr_urlmatch_destroy(&m);
 }
 
 int main(int argc, char **argv) {
