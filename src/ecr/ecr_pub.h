@@ -106,7 +106,9 @@ int ecr_pub_output_config(ecr_pub_t *pub, ecr_config_t *config);
 
 int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *output_config, ecr_config_t *config);
 
-void ecr_pub(ecr_pub_t *pub, void *data, int tid);
+void ecr_pub_key(ecr_pub_t *pub, void *data, void *key, size_t key_len, int tid);
+
+#define ecr_pub(pub, data, tid) ecr_pub_key(pub, data, NULL, 0, tid)
 
 void ecr_pub_destroy(ecr_pub_t *pub);
 

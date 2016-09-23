@@ -225,7 +225,7 @@ int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *output_config, e
     return 0;
 }
 
-void ecr_pub(ecr_pub_t *pub, void *data, int tid) {
+void ecr_pub_key(ecr_pub_t *pub, void *data, void *key, size_t key_len, int tid) {
     ecr_pub_output_t *output = pub->outputs;
     ecr_str_t *buf = &pub->buf_array[tid];
     FILE *stream = pub->stream_array[tid];
@@ -256,7 +256,7 @@ void ecr_pub(ecr_pub_t *pub, void *data, int tid) {
                 break;
             case ECR_PUB_KAFKA:
                 if (rd_kafka_produce(output->kafka.topic, RD_KAFKA_PARTITION_UA, RD_KAFKA_MSG_F_COPY, buf->ptr,
-                        buf->len, (NULL), 0, (NULL))) {
+                        buf->len, key, key_len, (NULL))) {
                     ok = 0;
                 }
                 rd_kafka_poll(output->kafka.kafka, 0);
