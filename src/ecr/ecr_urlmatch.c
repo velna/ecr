@@ -34,12 +34,7 @@ static inline ecr_list_t * build_split_list(ecr_str_t * in) {
         ecr_list_add(split, url);
         url = p + 1;
     }
-    if (strlen(url) > 0) {
-        ecr_list_add(split, url);
-    }
-    if (ecr_list_size(split) == 0) {
-        free(url);
-    }
+    ecr_list_add(split, url);
     return split;
 }
 
