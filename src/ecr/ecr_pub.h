@@ -12,13 +12,14 @@
 #include "ecr_config.h"
 #include "ecr_io.h"
 #include "ecr_counter.h"
+#include <pcap.h>
 #include <pthread.h>
 #include <librdkafka/rdkafka.h>
 
 #define ECR_PUB_CODEC_NONE  -1
 
 typedef enum {
-    ECR_PUB_STAT, ECR_PUB_ZMQ, ECR_PUB_FILE, ECR_PUB_KAFKA
+    ECR_PUB_STAT, ECR_PUB_ZMQ, ECR_PUB_FILE, ECR_PUB_KAFKA, ECR_PUB_PACKET
 } ecr_pub_type_t;
 
 typedef struct {
@@ -36,6 +37,9 @@ typedef struct {
             const char *brokers;
             const char *topic;
         } kafka;
+        struct {
+            const char *device;
+        } packet;
     };
     const char *format;
     ecr_config_t *config;
@@ -65,6 +69,9 @@ typedef struct ecr_pub_output_s {
             rd_kafka_t *kafka;
             rd_kafka_topic_t *topic;
         } kafka;
+        struct {
+            pcap_t *pcap;
+        } packet;
     };
     struct ecr_pub_output_s *next;
 } ecr_pub_output_t;

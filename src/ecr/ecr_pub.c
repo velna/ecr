@@ -14,6 +14,10 @@
 #include <string.h>
 #include <errno.h>
 #include <zmq.h>
+#include <net/if.h>
+#include <linux/if_ether.h>
+#include <linux/if_packet.h>
+#include <net/ethernet.h>
 
 int ecr_pub_init(ecr_pub_t *pub, const char *id, ecr_pub_config_t *config) {
     int i;
@@ -35,6 +39,7 @@ int ecr_pub_output_config(ecr_pub_t *pub, ecr_config_t *config) {
     ecr_pub_output_config_t file_config = { .type = ECR_PUB_FILE };
     ecr_pub_output_config_t zmq_config = { .type = ECR_PUB_ZMQ };
     ecr_pub_output_config_t kafka_config = { .type = ECR_PUB_KAFKA };
+    ecr_pub_output_config_t packet_config = { .type = ECR_PUB_PACKET };
     ecr_config_line_t config_lines[] = {
     //
             { "file_format", &file_config.format, ECR_CFG_STRING }, //
@@ -46,6 +51,7 @@ int ecr_pub_output_config(ecr_pub_t *pub, ecr_config_t *config) {
             { "kafka_format", &kafka_config.format, ECR_CFG_STRING }, //
             { "kafka_brokers", &kafka_config.kafka.brokers, ECR_CFG_STRING }, //
             { "kafka_topic", &kafka_config.kafka.topic, ECR_CFG_STRING }, //
+            { "packet_device", &kafka_config.packet.device, ECR_CFG_STRING }, //
             { 0 } };
 
     ecr_config_load(config, pub->id, config_lines);
@@ -70,6 +76,13 @@ int ecr_pub_output_config(ecr_pub_t *pub, ecr_config_t *config) {
             ok++;
         }
     }
+    if (packet_config.format && packet_config.packet.device) {
+        if (ecr_pub_output_add(pub, &packet_config, config)) {
+            error++;
+        } else {
+            ok++;
+        }
+    }
     if (!ok) {
         if (ecr_pub_output_add(pub, &stat_config, config)) {
             error++;
@@ -83,6 +96,7 @@ int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *output_config, e
     int i, j;
     char *fp, *s, errstr[512], *id;
     FILE *file;
+    char errbuf[PCAP_ERRBUF_SIZE];
 
     switch (output_config->type) {
     case ECR_PUB_STAT:
@@ -189,6 +203,17 @@ int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *output_config, e
         L_INFO("%s: add kafka output: %s@%s.", pub->id, output_config->kafka.topic, output_config->kafka.brokers);
         free(id);
         break;
+    case ECR_PUB_PACKET:
+        output->packet.pcap = pcap_create(output_config->packet.device, errbuf);
+        if (!output->packet.pcap) {
+            L_ERROR("error open device %s for output: %s", output_config->packet.device, errbuf);
+        }
+        if (pcap_activate(output->packet.pcap) != 0) {
+            L_ERROR("pcap_activate() error: %s", pcap_geterr(output->packet.pcap));
+            free(output);
+            return -1;
+        }
+        break;
     default:
         L_ERROR("%s: unknown pub type: %d", pub->id, output_config->type);
         free(output);
@@ -261,6 +286,11 @@ void ecr_pub_key(ecr_pub_t *pub, void *data, void *key, size_t key_len, int tid)
                 }
                 rd_kafka_poll(output->kafka.kafka, 0);
                 break;
+            case ECR_PUB_PACKET:
+                if (pcap_sendpacket(output->packet.pcap, (u_char*) buf->ptr, (int) buf->len)) {
+                    ok = 0;
+                }
+                break;
             default:
                 break;
             }
@@ -317,6 +347,11 @@ void ecr_pub_destroy(ecr_pub_t *pub) {
             }
             ecr_counter_delete(pub->config.cctx, pub->id, "kafka_ok");
             ecr_counter_delete(pub->config.cctx, pub->id, "kafka_bytes");
+            break;
+        case ECR_PUB_PACKET:
+            if (output->packet.pcap) {
+                pcap_close(output->packet.pcap);
+            }
             break;
         }
         free_to_null(output->format);
