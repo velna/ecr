@@ -207,6 +207,8 @@ int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *output_config, e
         output->packet.pcap = pcap_create(output_config->packet.device, errbuf);
         if (!output->packet.pcap) {
             L_ERROR("error open device %s for output: %s", output_config->packet.device, errbuf);
+            free(output);
+            return -1;
         }
         if (pcap_activate(output->packet.pcap) != 0) {
             L_ERROR("pcap_activate() error: %s", pcap_geterr(output->packet.pcap));

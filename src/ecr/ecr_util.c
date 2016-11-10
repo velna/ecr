@@ -279,15 +279,17 @@ int ecr_wildcard_match(char *src, char *pattern, int ignore_case) {
 }
 
 char *ecr_mem_replace_char(char *str, size_t len, const char *finds, char replacement) {
-    const char *f = finds;
+    const char *f;
     size_t i = 0;
+    int map[256] = { 0 };
+    f = finds;
+    while (*f) {
+        map[(uint8_t) *f] = 1;
+        f++;
+    }
     while (i < len) {
-        while (*f) {
-            if (str[i] == *f) {
-                str[i] = replacement;
-                break;
-            }
-            f++;
+        if (map[(uint8_t) str[i]]) {
+            str[i] = replacement;
         }
         i++;
     }
