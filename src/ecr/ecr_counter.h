@@ -19,6 +19,9 @@
 #define ECR_COUNTER_NO_RESET        0x04
 
 typedef struct {
+    uint64_t snapshot_timestamp;
+    uint64_t last_timestamp;
+    uint64_t init_timestamp;
     char *group;
     char *name;
     int opt;
@@ -28,8 +31,6 @@ typedef struct {
 } ecr_counter_t;
 
 typedef struct {
-    uint64_t last_timestamp;
-    uint64_t init_timestamp;
     ecr_list_t counters;
     ecr_hashmap_t countermap;
 } ecr_counter_ctx_t;
@@ -56,7 +57,8 @@ ecr_counter_t* ecr_counter_xstore(ecr_counter_ctx_t *ctx, const char *group, con
 #define ecr_counter_incr(c)     AO_fetch_and_add1(&((c)->value))
 #define ecr_counter_decr(c)     AO_fetch_and_sub1(&((c)->value))
 #define ecr_counter_store(c, v) AO_store_full(&((c)->value), v)
-#define ecr_counter_clear(c)    AO_store_full(&((c)->value), (c)->snapshot = (c)->last = 0)
+
+void ecr_counter_clear(ecr_counter_t *counter);
 
 void ecr_counter_reset_group(ecr_counter_ctx_t *ctx, const char *group);
 
