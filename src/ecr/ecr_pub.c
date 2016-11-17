@@ -51,7 +51,8 @@ int ecr_pub_output_config(ecr_pub_t *pub, ecr_config_t *config) {
             { "kafka_format", &kafka_config.format, ECR_CFG_STRING }, //
             { "kafka_brokers", &kafka_config.kafka.brokers, ECR_CFG_STRING }, //
             { "kafka_topic", &kafka_config.kafka.topic, ECR_CFG_STRING }, //
-            { "packet_device", &kafka_config.packet.device, ECR_CFG_STRING }, //
+            { "packet_format", &packet_config.format, ECR_CFG_STRING }, //
+            { "packet_device", &packet_config.packet.device, ECR_CFG_STRING }, //
             { 0 } };
 
     ecr_config_load(config, pub->id, config_lines);
@@ -215,6 +216,11 @@ int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *output_config, e
             free(output);
             return -1;
         }
+        output->ok = ecr_counter_create(pub->config.cctx, pub->id, "packet_ok", 0);
+        output->error = ecr_counter_create(pub->config.cctx, pub->id, "packet_error", 0);
+        output->bytes_ok = ecr_counter_create(pub->config.cctx, pub->id, "packet_bytes_ok", 0);
+        output->bytes_error = ecr_counter_create(pub->config.cctx, pub->id, "packet_bytes_error", 0);
+        L_INFO("%s: add packet output: %s.", pub->id, output_config->packet.device);
         break;
     default:
         L_ERROR("%s: unknown pub type: %d", pub->id, output_config->type);
