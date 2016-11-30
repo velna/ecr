@@ -810,53 +810,51 @@ static int ecr_bwl_load_mongo(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, 
     bson_init(&query);
     cursor = mongoc_collection_find(collection, MONGOC_QUERY_SLAVE_OK, 0, 0, 0, &main_query, NULL, NULL);
     bson_destroy(&main_query);
-    while (!mongoc_cursor_error(cursor, &err) && mongoc_cursor_more(cursor)) {
-        if (mongoc_cursor_next(cursor, &doc)) {
-            if (!bson_iter_init_find(&i, doc, "match_type") || bson_iter_type(&i) != BSON_TYPE_UTF8) {
-                ecr_bwl_log(data->bwl, LOG_ERR, "can not find field 'match_type' of type string");
+    while (mongoc_cursor_next(cursor, &doc)) {
+        if (!bson_iter_init_find(&i, doc, "match_type") || bson_iter_type(&i) != BSON_TYPE_UTF8) {
+            ecr_bwl_log(data->bwl, LOG_ERR, "can not find field 'match_type' of type string");
+            rc = -1;
+            goto l_end;
+        }
+        match_type = bson_iter_utf8(&i, NULL);
+        if (!bson_iter_init_find(&i, doc, "field") || bson_iter_type(&i) != BSON_TYPE_UTF8) {
+            ecr_bwl_log(data->bwl, LOG_ERR, "can not find field 'field' of type string");
+            rc = -1;
+            goto l_end;
+        }
+        field = bson_iter_utf8(&i, NULL);
+        if (!bson_iter_init_find(&i, doc, "m_date") || bson_iter_type(&i) != BSON_TYPE_DATE_TIME) {
+            ecr_bwl_log(data->bwl, LOG_ERR, "can not find field 'm_date' of type datetime");
+            rc = -1;
+            goto l_end;
+        }
+        m_date = m_date > bson_iter_date_time(&i) ? m_date : bson_iter_date_time(&i);
+        if (ecr_bwl_make_expr(data, source_data, field, match_type, &bwtype, &group_items)) {
+            ecr_bwl_log(data->bwl, LOG_ERR, "invalid match_type: '%s'", match_type);
+            rc = -1;
+            goto l_end;
+        }
+        switch (bwtype) {
+        case BWL_EQUALS:
+        case BWL_WUMANBER:
+        case BWL_REGEX:
+            if (!bson_iter_init_find(&i, doc, "items") || bson_iter_type(&i) != BSON_TYPE_ARRAY) {
+                ecr_bwl_log(data->bwl, LOG_ERR, "can not find field 'items' of type array");
                 rc = -1;
                 goto l_end;
             }
-            match_type = bson_iter_utf8(&i, NULL);
-            if (!bson_iter_init_find(&i, doc, "field") || bson_iter_type(&i) != BSON_TYPE_UTF8) {
-                ecr_bwl_log(data->bwl, LOG_ERR, "can not find field 'field' of type string");
-                rc = -1;
-                goto l_end;
-            }
-            field = bson_iter_utf8(&i, NULL);
-            if (!bson_iter_init_find(&i, doc, "m_date") || bson_iter_type(&i) != BSON_TYPE_DATE_TIME) {
-                ecr_bwl_log(data->bwl, LOG_ERR, "can not find field 'm_date' of type datetime");
-                rc = -1;
-                goto l_end;
-            }
-            m_date = m_date > bson_iter_date_time(&i) ? m_date : bson_iter_date_time(&i);
-            if (ecr_bwl_make_expr(data, source_data, field, match_type, &bwtype, &group_items)) {
-                ecr_bwl_log(data->bwl, LOG_ERR, "invalid match_type: '%s'", match_type);
-                rc = -1;
-                goto l_end;
-            }
-            switch (bwtype) {
-            case BWL_EQUALS:
-            case BWL_WUMANBER:
-            case BWL_REGEX:
-                if (!bson_iter_init_find(&i, doc, "items") || bson_iter_type(&i) != BSON_TYPE_ARRAY) {
-                    ecr_bwl_log(data->bwl, LOG_ERR, "can not find field 'items' of type array");
-                    rc = -1;
-                    goto l_end;
-                }
-                bson_iter_array(&i, &items_len, &items_buf);
-                bson_init_static(&items, items_buf, items_len);
-                bson_iter_init(&si, &items);
-                while (bson_iter_next(&si) && bson_iter_type(&si) == BSON_TYPE_UTF8) {
-                    ecr_list_add(group_items, strdup(bson_iter_utf8(&si, NULL)));
-                    rc++;
-                }
-                bson_destroy(&items);
-                break;
-            case BWL_EXISTS:
+            bson_iter_array(&i, &items_len, &items_buf);
+            bson_init_static(&items, items_buf, items_len);
+            bson_iter_init(&si, &items);
+            while (bson_iter_next(&si) && bson_iter_type(&si) == BSON_TYPE_UTF8) {
+                ecr_list_add(group_items, strdup(bson_iter_utf8(&si, NULL)));
                 rc++;
-                break;
             }
+            bson_destroy(&items);
+            break;
+        case BWL_EXISTS:
+            rc++;
+            break;
         }
     }
 
