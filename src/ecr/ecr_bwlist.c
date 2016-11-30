@@ -730,12 +730,12 @@ static int ecr_bwl_load_string(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource,
 
 static int ecr_bwl_load_mongo(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, int force) {
     ecr_bwl_type_t bwtype;
-    const char *field, *match_type, *tag;
-    int rc = 0, idx;
-    char *db_name, *collection_name;
+    const char *field, *match_type;
+    int rc = 0;
+    char *db_name, *collection_name, *json_query, *str, *save;
     int64_t count = 0, m_date = 0, n;
     bson_error_t err;
-    bson_t query, bson, items;
+    bson_t main_query, query, bson, items;
     const bson_t *doc;
     mongoc_cursor_t *cursor = NULL;
     bson_iter_t i, si;
@@ -753,14 +753,35 @@ static int ecr_bwl_load_mongo(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, 
 
     source_data_tmp = NULL;
     source_data = ecr_bwl_source_data_init(bwsource);
-    idx = strcspn(bwsource->source, ".");
-    db_name = strndup(bwsource->source, idx);
-    collection_name = bwsource->source + idx + 1;
+    str = strdup(bwsource->source);
+    save = NULL;
+    json_query = strtok_r(str, "@", &save);
+    db_name = strtok_r(NULL, ".", &save);
+    if (!db_name) {
+        json_query = NULL;
+        db_name = strtok_r(str, ".", &save);
+    }
+    collection_name = strtok_r(NULL, ".", &save);
+    if (!db_name || !collection_name) {
+        ecr_bwl_log(data->bwl, LOG_ERR, "invalid mongo source: %s", bwsource->source);
+        free(str);
+        return -1;
+    }
+    if (json_query) {
+        if (bson_init_from_json(&main_query, json_query, strlen(json_query), &err) == false) {
+            ecr_bwl_log(data->bwl, LOG_ERR, "invalid mongo source: %s", bwsource->source);
+            free(str);
+            return -1;
+        }
+    } else {
+        bson_init(&main_query);
+    }
+
     client = mongoc_client_pool_pop(data->bwl->opts.mongo_pool);
     collection = mongoc_client_get_collection(client, db_name, collection_name);
-    free(db_name);
+    free(str);
 
-    count = mongoc_collection_count(collection, MONGOC_QUERY_SLAVE_OK, NULL, 0, 1, NULL, &err);
+    count = mongoc_collection_count(collection, MONGOC_QUERY_SLAVE_OK, &main_query, 0, 1, NULL, &err);
     if (count == -1) {
         ecr_bwl_log(data->bwl, LOG_ERR, "mongo connection error: %s[%d]", err.message, err.code);
         rc = -1;
@@ -773,6 +794,7 @@ static int ecr_bwl_load_mongo(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, 
         bson_append_document(&query, "m_date", -1, &bson);
         n = mongoc_collection_count(collection, MONGOC_QUERY_SLAVE_OK, &query, 0, 1, NULL, &err);
         bson_destroy(&query);
+        bson_copy_to(&main_query, &query);
         bson_destroy(&bson);
         if (n == -1) {
             ecr_bwl_log(data->bwl, LOG_ERR, "mongo connection error: %s[%d]", err.message, err.code);
@@ -786,8 +808,8 @@ static int ecr_bwl_load_mongo(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, 
     }
 
     bson_init(&query);
-    cursor = mongoc_collection_find(collection, MONGOC_QUERY_SLAVE_OK, 0, 0, 0, &query, NULL, NULL);
-    bson_destroy(&query);
+    cursor = mongoc_collection_find(collection, MONGOC_QUERY_SLAVE_OK, 0, 0, 0, &main_query, NULL, NULL);
+    bson_destroy(&main_query);
     while (!mongoc_cursor_error(cursor, &err) && mongoc_cursor_more(cursor)) {
         if (mongoc_cursor_next(cursor, &doc)) {
             if (!bson_iter_init_find(&i, doc, "match_type") || bson_iter_type(&i) != BSON_TYPE_UTF8) {
@@ -802,23 +824,12 @@ static int ecr_bwl_load_mongo(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, 
                 goto l_end;
             }
             field = bson_iter_utf8(&i, NULL);
-            if (bson_iter_init_find(&i, doc, "tag") && bson_iter_type(&i) == BSON_TYPE_UTF8) {
-                tag = bson_iter_utf8(&i, NULL);
-            } else {
-                tag = NULL;
-            }
             if (!bson_iter_init_find(&i, doc, "m_date") || bson_iter_type(&i) != BSON_TYPE_DATE_TIME) {
                 ecr_bwl_log(data->bwl, LOG_ERR, "can not find field 'm_date' of type datetime");
                 rc = -1;
                 goto l_end;
             }
             m_date = m_date > bson_iter_date_time(&i) ? m_date : bson_iter_date_time(&i);
-            if (tag) {
-                source_data_tmp = source_data;
-                source_data = ecr_bwl_source_data_init(bwsource);
-                source_data->id = data->next_sid++;
-                source_data->user = strdup(tag);
-            }
             if (ecr_bwl_make_expr(data, source_data, field, match_type, &bwtype, &group_items)) {
                 ecr_bwl_log(data->bwl, LOG_ERR, "invalid match_type: '%s'", match_type);
                 rc = -1;
@@ -845,15 +856,6 @@ static int ecr_bwl_load_mongo(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, 
             case BWL_EXISTS:
                 rc++;
                 break;
-            }
-            if (tag) {
-                if (ecr_bwl_source_data_add(source_data, data)) {
-                    ecr_bwl_source_data_destroy(source_data);
-                    source_data = source_data_tmp;
-                    rc = -1;
-                    goto l_end;
-                }
-                source_data = source_data_tmp;
             }
         }
     }

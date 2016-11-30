@@ -52,8 +52,8 @@ typedef struct {
 typedef struct ecr_bwl_expr_s {
     ecr_bwl_logic_t logic;
     union {
-        int id;
-        struct {
+        int id; // 为叶子节点时
+        struct { // 为非叶子节点时
             struct ecr_bwl_expr_s *left;
             struct ecr_bwl_expr_s *right;
         };
@@ -73,17 +73,17 @@ typedef struct ecr_bwl_group_s {
     ecr_fixedhash_key_t name_key;
     ecr_bwl_type_t type;
     union {
-        ecr_hashmap_t equals;
+        ecr_hashmap_t equals; //<"$field_value", [ecr_bwl_user_t]>
         ecr_wm_t wumanber;
-        ecr_list_t exists;
-        ecr_hashmap_t regex;
+        ecr_list_t exists; //<ecr_bwl_user_t>
+        ecr_hashmap_t regex; //<ecr_bwl_regex_t, [ecr_bwl_user_t]>
     } items;
     struct ecr_bwl_group_s *next;
 } ecr_bwl_group_t;
 
 typedef struct {
     int id;
-    void *user;
+    void *user; //ecr_bwl_add方法传入的user指针。
     union {
         struct timespec file_m_date;
         struct {
@@ -99,31 +99,31 @@ typedef struct {
 
 typedef struct ecr_bwl_source_data_s {
     int id;
-    void *user;
+    void *user; //ecr_bwl_add方法传入的user指针。启用tag时，则为tag指针。
     ecr_bwl_source_t *source;
-    ecr_hashmap_t item_groups;
-    ecr_hashmap_t expr_map;
+    ecr_hashmap_t item_groups; //<"$group_name", ["$item",...]>
+    ecr_hashmap_t expr_map; //<"$expression","$expression">用来对expressions进行去重
     ecr_bwl_expr_t *expr;
     struct ecr_bwl_source_data_s *next;
 } ecr_bwl_source_data_t;
 
 typedef struct {
-    int next_sid;
-    ecr_list_t source_list;
+    int next_sid; //自增长的source data id
+    ecr_list_t source_list; //<ecr_bwl_source_t>
     ecr_bwl_t *bwl;
     ecr_bwl_group_t *groups;
-    int next_expr_id;
+    int next_expr_id; //自增长的expression id
     ecr_bwl_source_data_t *source_data;
-    ecr_hashmap_t user_map;
+    ecr_hashmap_t user_map; //<"$sid:$field $match_tpe $group", ecr_bwl_user_t>
 } ecr_bwl_data_t;
 
 struct ecr_bwl_s {
-    unsigned int version;
+    unsigned int version; //每编译一次，version值加1。如果和ecr_bwl_result_t的version不一致，则匹配返回－1
     pthread_mutex_t lock;
     ecr_bwl_opt_t opts;
-    ecr_bwl_data_t *data;
-    ecr_bwl_data_t *tmp_data;
-    ecr_bwl_data_t *next_data;
+    ecr_bwl_data_t *data; //存放正在使用的数据
+    ecr_bwl_data_t *tmp_data; //临时数据
+    ecr_bwl_data_t *next_data; //正在编译的数据
 };
 
 typedef struct {
