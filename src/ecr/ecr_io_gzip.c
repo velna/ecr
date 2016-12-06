@@ -724,8 +724,6 @@ static int ecr_gzip_close_r(ecr_gzip_file_t *gzfile) {
     }
     err = gzfile->err == Z_BUF_ERROR ? Z_BUF_ERROR : Z_OK;
     ret = fclose(gzfile->source);
-    ecr_config_destroy(&gzfile->config);
-    free(gzfile);
     return ret ? Z_ERRNO : err;
 }
 
@@ -737,8 +735,9 @@ static int ecr_gzip_close_w(ecr_gzip_file_t *gzfile) {
         return Z_STREAM_ERROR;
 
     /* check that we're writing */
-    if (gzfile->mode != GZ_WRITE)
+    if (gzfile->mode != GZ_WRITE) {
         return Z_STREAM_ERROR;
+    }
 
     /* check for seek request */
     if (gzfile->seek) {
@@ -759,8 +758,6 @@ static int ecr_gzip_close_w(ecr_gzip_file_t *gzfile) {
     }
     if (fclose(gzfile->source) == -1)
         ret = Z_ERRNO;
-    ecr_config_destroy(&gzfile->config);
-    free(gzfile);
     return ret;
 }
 
@@ -770,7 +767,10 @@ static int ecr_gzip_close(void *cookie) {
     if (gzfile == NULL)
         return Z_STREAM_ERROR;
 
-    return gzfile->mode == GZ_READ ? ecr_gzip_close_r(gzfile) : ecr_gzip_close_w(gzfile);
+    int rc = (gzfile->mode == GZ_READ ? ecr_gzip_close_r(gzfile) : ecr_gzip_close_w(gzfile));
+    ecr_config_destroy(&gzfile->config);
+    free(gzfile);
+    return rc;
 }
 
 static cookie_io_functions_t ecr_gzip_io_functions = { .read = ecr_gzip_read, .write = ecr_gzip_write, .seek =
