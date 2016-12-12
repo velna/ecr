@@ -118,7 +118,7 @@ typedef struct {
 } ecr_bwl_data_t;
 
 struct ecr_bwl_s {
-    unsigned int version; //每编译一次，version值加1。如果和ecr_bwl_result_t的version不一致，则匹配返回－1
+    volatile unsigned int version; //每编译一次，version值加1。如果和ecr_bwl_result_t的version不一致，则匹配返回－1
     pthread_mutex_t lock;
     ecr_bwl_opt_t opts;
     ecr_bwl_data_t *data; //存放正在使用的数据

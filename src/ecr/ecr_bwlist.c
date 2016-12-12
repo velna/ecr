@@ -791,10 +791,10 @@ static int ecr_bwl_load_mongo(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, 
         bson_init(&bson);
         bson_append_date_time(&bson, "$gt", -1, bwsource->status.mongo.m_date);
         bson_init(&query);
+        bson_copy_to(&main_query, &query);
         bson_append_document(&query, "m_date", -1, &bson);
         n = mongoc_collection_count(collection, MONGOC_QUERY_SLAVE_OK, &query, 0, 1, NULL, &err);
         bson_destroy(&query);
-        bson_copy_to(&main_query, &query);
         bson_destroy(&bson);
         if (n == -1) {
             ecr_bwl_log(data->bwl, LOG_ERR, "mongo connection error: %s[%d]", err.message, err.code);
@@ -880,7 +880,7 @@ static int ecr_bwl_load_mongo(ecr_bwl_data_t *data, ecr_bwl_source_t *bwsource, 
         if (rc >= 0) {
             bwsource->status.mongo.doc_count = count;
             bwsource->status.mongo.m_date = m_date;
-            ecr_bwl_log(data->bwl, LOG_INFO, "load %d items from mongo collection %s", rc, bwsource->source);
+            ecr_bwl_log(data->bwl, LOG_INFO, "load %d items from mongo collection %s.", rc, bwsource->source);
         }
         return rc;
     }
@@ -1041,13 +1041,14 @@ int ecr_bwl_compile(ecr_bwl_t *list) {
     int rc;
     ecr_bwl_data_t *data;
     pthread_mutex_lock(&list->lock);
+    ecr_bwl_data_clear(list->tmp_data);
     rc = ecr_bwl_compile_0(list->next_data, 1);
     if (rc == 0) {
+        list->version++;
         data = list->data;
         list->data = list->next_data;
         list->next_data = list->tmp_data;
         list->tmp_data = data;
-        list->version++;
     }
     pthread_mutex_unlock(&list->lock);
     return rc;
@@ -1064,14 +1065,19 @@ int ecr_bwl_reload_0(ecr_bwl_t *list, int force) {
         }
     }
     ecr_bwl_data_clear(list->tmp_data);
+    if (ecr_list_size(&list->next_data->source_list) > 0) {
+        force = 1;
+        ecr_bwl_data_copy(list->next_data, list->tmp_data);
+    } else {
+        ecr_bwl_data_copy(list->data, list->tmp_data);
+    }
     ecr_bwl_data_clear(list->next_data); // free memory
-    ecr_bwl_data_copy(list->data, list->tmp_data);
     rc = ecr_bwl_compile_0(list->tmp_data, force);
     if (rc == 0) {
+        list->version++;
         data = list->data;
         list->data = list->tmp_data;
         list->tmp_data = data;
-        list->version++;
     }
     pthread_mutex_unlock(&list->lock);
     return rc;
