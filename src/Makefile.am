@@ -48,6 +48,10 @@ libecr_la_SOURCES = \
 	ecr/ecr_bloomfilter.c \
 	ecr/ecr_buf.c \
 	ecr/ecr_bwlist.c \
+	ecr/ecr_bwlist_equals.c \
+	ecr/ecr_bwlist_wumanber.c \
+	ecr/ecr_bwlist_exists.c \
+	ecr/ecr_bwlist_regex.c \
 	ecr/ecr_cmd.c \
 	ecr/ecr_config.c \
 	ecr/ecr_counter.c \

@@ -17,23 +17,34 @@
 #include <stdio.h>
 #include <mongoc.h>
 
-#define ECR_BWL_NAME_EQUALS             "equals"
-#define ECR_BWL_NAME_WUMANBER           "wumanber"
-#define ECR_BWL_NAME_EXISTS             "exists"
-#define ECR_BWL_NAME_REGEX              "regex"
-
 #define ECR_BWL_SOURCE_STRING            "string:"
 #define ECR_BWL_SOURCE_FILE              "file:"
 #define ECR_BWL_SOURCE_CFILE             "cfile:"
 #define ECR_BWL_SOURCE_MONGODB           "mongodb:"
 
+typedef struct {
+    unsigned int version;
+    void **users;
+    size_t users_size;
+    ecr_str_t sources;
+    ecr_str_t exprs;
+    ecr_str_t **expr_items;
+} ecr_bwl_result_t;
+
+typedef struct {
+    const char *name;
+    int has_items :1;
+    void *(*init)(const char *name);
+    void (*destroy)(void *data);
+    int (*add_item)(void *data, const char *item, void *user);
+    void (*match)(void *data, ecr_str_t *hdr, ecr_bwl_result_t *results);
+    void (*compile)(void *data);
+    size_t (*size)(void *data);
+} ecr_bwl_match_t;
+
 typedef enum {
     BWL_FILE = 1, BWL_CFILE, BWL_MONGO, BWL_STRING
 } ecr_bwl_source_type_t;
-
-typedef enum {
-    BWL_EQUALS = 1, BWL_WUMANBER, BWL_EXISTS, BWL_REGEX
-} ecr_bwl_type_t;
 
 typedef enum {
     BWL_NONE = 0, BWL_AND, BWL_OR, BWL_NOT
@@ -71,13 +82,15 @@ typedef struct {
 typedef struct ecr_bwl_group_s {
     ecr_str_t name;
     ecr_fixedhash_key_t name_key;
-    ecr_bwl_type_t type;
-    union {
-        ecr_hashmap_t equals; //<"$field_value", [ecr_bwl_user_t]>
-        ecr_wm_t wumanber;
-        ecr_list_t exists; //<ecr_bwl_user_t>
-        ecr_hashmap_t regex; //<ecr_bwl_regex_t, [ecr_bwl_user_t]>
-    } items;
+//    ecr_bwl_type_t type;
+//    union {
+//        ecr_hashmap_t equals; //<"$field_value", [ecr_bwl_user_t]>
+//        ecr_wm_t wumanber;
+//        ecr_list_t exists; //<ecr_bwl_user_t>
+//        ecr_hashmap_t regex; //<ecr_bwl_regex_t, [ecr_bwl_user_t]>
+//    } items;
+    ecr_bwl_match_t *match;
+    void *match_data;
     struct ecr_bwl_group_s *next;
 } ecr_bwl_group_t;
 
@@ -121,19 +134,16 @@ struct ecr_bwl_s {
     volatile unsigned int version; //每编译一次，version值加1。如果和ecr_bwl_result_t的version不一致，则匹配返回－1
     pthread_mutex_t lock;
     ecr_bwl_opt_t opts;
+    ecr_hashmap_t match_map;
     ecr_bwl_data_t *data; //存放正在使用的数据
     ecr_bwl_data_t *tmp_data; //临时数据
     ecr_bwl_data_t *next_data; //正在编译的数据
 };
 
-typedef struct {
-    unsigned int version;
-    void **users;
-    size_t users_size;
-    ecr_str_t sources;
-    ecr_str_t exprs;
-    ecr_str_t **expr_items;
-} ecr_bwl_result_t;
+extern ecr_bwl_match_t ecr_bwl_equals;
+extern ecr_bwl_match_t ecr_bwl_wumanber;
+extern ecr_bwl_match_t ecr_bwl_exists;
+extern ecr_bwl_match_t ecr_bwl_regex;
 
 int ecr_bwl_init(ecr_bwl_t *list, ecr_bwl_opt_t *opt);
 
@@ -164,6 +174,18 @@ ecr_bwl_result_t * ecr_bwl_result_init(ecr_bwl_t *list);
 void ecr_bwl_result_clear(ecr_bwl_result_t *result);
 
 void ecr_bwl_result_destroy(ecr_bwl_result_t *result);
+
+static inline void ecr_bwl_add_matched(ecr_bwl_result_t *result, ecr_list_t *users, ecr_str_t *item) {
+    int i, expr_id;
+    size_t size;
+
+    size = ecr_list_size(users);
+    for (i = 0; i < size; i++) {
+        expr_id = ((ecr_bwl_user_t*) users->data[i])->expr_id;
+        result->exprs.ptr[expr_id] = 1;
+        result->expr_items[expr_id] = item;
+    }
+}
 
 int ecr_bwl_matches_fixed(ecr_bwl_t *list, ecr_fixedhash_t *hash, ecr_bwl_result_t *results);
 
