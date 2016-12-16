@@ -270,39 +270,41 @@ void ecr_pub_key(ecr_pub_t *pub, void *data, void *key, size_t key_len, int tid)
             rewind(stream);
             pub->config.write_cb(pub, output, stream, data, tid);
             fflush(stream);
-            switch (output->type) {
-            case ECR_PUB_ZMQ:
-                pthread_mutex_lock(&output->zmq.lock);
-                if (zmq_send(output->zmq.skt, buf->ptr, buf->len, ZMQ_DONTWAIT) == -1) {
-                    ok = 0;
+            if (buf->len) {
+                switch (output->type) {
+                case ECR_PUB_ZMQ:
+                    pthread_mutex_lock(&output->zmq.lock);
+                    if (zmq_send(output->zmq.skt, buf->ptr, buf->len, ZMQ_DONTWAIT) == -1) {
+                        ok = 0;
+                    }
+                    pthread_mutex_unlock(&output->zmq.lock);
+                    break;
+                case ECR_PUB_FILE:
+                    if (fwrite(buf->ptr, buf->len, 1,
+                            output->file.array[tid * output->file.split + output->file.idx_array[tid]]) != 1) {
+                        ok = 0;
+                    }
+                    if (++output->file.idx_array[tid] == output->file.split) {
+                        output->file.idx_array[tid] = 0;
+                    }
+                    break;
+                case ECR_PUB_KAFKA:
+                    if (rd_kafka_produce(output->kafka.topic, RD_KAFKA_PARTITION_UA, RD_KAFKA_MSG_F_COPY, buf->ptr,
+                            buf->len, key, key_len, (NULL))) {
+                        ok = 0;
+                    }
+                    rd_kafka_poll(output->kafka.kafka, 0);
+                    break;
+                case ECR_PUB_PACKET:
+                    if (pcap_sendpacket(output->packet.pcap, (u_char*) buf->ptr, (int) buf->len)) {
+                        ok = 0;
+                    }
+                    break;
+                default:
+                    break;
                 }
-                pthread_mutex_unlock(&output->zmq.lock);
-                break;
-            case ECR_PUB_FILE:
-                if (fwrite(buf->ptr, buf->len, 1,
-                        output->file.array[tid * output->file.split + output->file.idx_array[tid]]) != 1) {
-                    ok = 0;
-                }
-                if (++output->file.idx_array[tid] == output->file.split) {
-                    output->file.idx_array[tid] = 0;
-                }
-                break;
-            case ECR_PUB_KAFKA:
-                if (rd_kafka_produce(output->kafka.topic, RD_KAFKA_PARTITION_UA, RD_KAFKA_MSG_F_COPY, buf->ptr,
-                        buf->len, key, key_len, (NULL))) {
-                    ok = 0;
-                }
-                rd_kafka_poll(output->kafka.kafka, 0);
-                break;
-            case ECR_PUB_PACKET:
-                if (pcap_sendpacket(output->packet.pcap, (u_char*) buf->ptr, (int) buf->len)) {
-                    ok = 0;
-                }
-                break;
-            default:
-                break;
+                ecr_counter_add(ok ? output->bytes_ok : output->bytes_error, buf->len);
             }
-            ecr_counter_add(ok ? output->bytes_ok : output->bytes_error, buf->len);
         }
         ecr_counter_incr(ok ? output->ok : output->error);
         output = output->next;
