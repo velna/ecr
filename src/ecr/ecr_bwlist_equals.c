@@ -33,22 +33,22 @@ static void ecr_bwl_equals_destroy(void *data) {
     free(equals);
 }
 
-static int ecr_bwl_equals_add_item(void *data, const char *item, void *user) {
+static int ecr_bwl_equals_add_item(void *data, const char *item, int expr_id) {
     ecr_bwl_equals_t *equals = data;
     ecr_list_t *expr_ids;
     if ((expr_ids = ecr_hashmap_get(&equals->items, (const void *) item, strlen(item))) == NULL) {
         expr_ids = ecr_list_new(1);
         ecr_hashmap_put(&equals->items, (const void *) item, strlen(item), expr_ids);
     }
-    ecr_list_add(expr_ids, user);
+    ecr_list_add(expr_ids, NULL + expr_id);
     return 0;
 }
 
 static void ecr_bwl_equals_match(void *data, ecr_str_t *hdr, ecr_bwl_result_t *results) {
     ecr_bwl_equals_t *equals = data;
-    ecr_list_t *users;
-    if ((users = ecr_hashmap_get(&equals->items, hdr->ptr, hdr->len)) != NULL) {
-        ecr_bwl_add_matched(results, users, hdr);
+    ecr_list_t *expr_ids;
+    if ((expr_ids = ecr_hashmap_get(&equals->items, hdr->ptr, hdr->len)) != NULL) {
+        ecr_bwl_add_matched(results, expr_ids, hdr);
     }
 }
 

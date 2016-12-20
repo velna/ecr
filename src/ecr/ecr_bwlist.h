@@ -36,7 +36,7 @@ typedef struct {
     int has_items :1;
     void *(*init)(const char *name);
     void (*destroy)(void *data);
-    int (*add_item)(void *data, const char *item, void *user);
+    int (*add_item)(void *data, const char *item, int expr_id);
     void (*match)(void *data, ecr_str_t *hdr, ecr_bwl_result_t *results);
     void (*compile)(void *data);
     size_t (*size)(void *data);
@@ -53,12 +53,6 @@ typedef enum {
 typedef struct ecr_bwl_s ecr_bwl_t;
 
 typedef void (*ecr_bwl_log_handler)(ecr_bwl_t *list, int level, const char *message);
-
-typedef struct {
-    int expr_id;
-    char *tag;
-    void *user;
-} ecr_bwl_user_t;
 
 typedef struct ecr_bwl_expr_s {
     ecr_bwl_logic_t logic;
@@ -82,13 +76,6 @@ typedef struct {
 typedef struct ecr_bwl_group_s {
     ecr_str_t name;
     ecr_fixedhash_key_t name_key;
-//    ecr_bwl_type_t type;
-//    union {
-//        ecr_hashmap_t equals; //<"$field_value", [ecr_bwl_user_t]>
-//        ecr_wm_t wumanber;
-//        ecr_list_t exists; //<ecr_bwl_user_t>
-//        ecr_hashmap_t regex; //<ecr_bwl_regex_t, [ecr_bwl_user_t]>
-//    } items;
     ecr_bwl_match_t *match;
     void *match_data;
     struct ecr_bwl_group_s *next;
@@ -127,7 +114,7 @@ typedef struct {
     ecr_bwl_group_t *groups;
     int next_expr_id; //自增长的expression id
     ecr_bwl_source_data_t *source_data;
-    ecr_hashmap_t user_map; //<"$sid:$field $match_tpe $group", ecr_bwl_user_t>
+    ecr_hashmap_t expr_id_map; //<"$sid:$field $match_tpe $group", expr_id>
 } ecr_bwl_data_t;
 
 struct ecr_bwl_s {
@@ -175,13 +162,13 @@ void ecr_bwl_result_clear(ecr_bwl_result_t *result);
 
 void ecr_bwl_result_destroy(ecr_bwl_result_t *result);
 
-static inline void ecr_bwl_add_matched(ecr_bwl_result_t *result, ecr_list_t *users, ecr_str_t *item) {
+static inline void ecr_bwl_add_matched(ecr_bwl_result_t *result, ecr_list_t *expr_ids, ecr_str_t *item) {
     int i, expr_id;
     size_t size;
 
-    size = ecr_list_size(users);
+    size = ecr_list_size(expr_ids);
     for (i = 0; i < size; i++) {
-        expr_id = ((ecr_bwl_user_t*) users->data[i])->expr_id;
+        expr_id = (expr_ids->data[i] - NULL);
         result->exprs.ptr[expr_id] = 1;
         result->expr_items[expr_id] = item;
     }

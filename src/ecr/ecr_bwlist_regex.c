@@ -18,7 +18,7 @@ typedef struct {
 
 typedef struct {
     char *name;
-    ecr_hashmap_t items; //<ecr_bwl_regex_t, [ecr_bwl_user_t]>
+    ecr_hashmap_t items; //<ecr_bwl_regex_t, expr_id>
 } ecr_bwl_regex_t;
 
 static void * ecr_bwl_regex_init(const char *name) {
@@ -43,7 +43,7 @@ static void ecr_bwl_regex_destroy(void *data) {
     free(regex);
 }
 
-static int ecr_bwl_regex_add_item(void *data, const char *item, void *user) {
+static int ecr_bwl_regex_add_item(void *data, const char *item, int expr_id) {
     ecr_bwl_regex_t *regex = data;
     ecr_bwl_regex_data_t *reg;
     size_t len;
@@ -62,6 +62,7 @@ static int ecr_bwl_regex_add_item(void *data, const char *item, void *user) {
             regfree(&reg->regex);
             free(reg);
         }
+        ecr_list_add(expr_ids, NULL + expr_id);
     } else {
         free(reg);
         rc = -1;
@@ -74,12 +75,12 @@ static void ecr_bwl_regex_match(void *data, ecr_str_t *hdr, ecr_bwl_result_t *re
     ecr_bwl_regex_t *regex = data;
     ecr_hashmap_iter_t it;
     ecr_bwl_regex_data_t *reg;
-    ecr_list_t *users;
+    ecr_list_t *expr_ids;
 
     ecr_hashmap_iter_init(&it, &regex->items);
-    while (ecr_hashmap_iter_next(&it, (void **) &reg, NULL, (void**) &users) == 0) {
+    while (ecr_hashmap_iter_next(&it, (void **) &reg, NULL, (void**) &expr_ids) == 0) {
         if (regexec(&reg->regex, hdr->ptr, 0, NULL, 0) == 0) {
-            ecr_bwl_add_matched(results, users, &reg->pattern);
+            ecr_bwl_add_matched(results, expr_ids, &reg->pattern);
         }
     }
 }

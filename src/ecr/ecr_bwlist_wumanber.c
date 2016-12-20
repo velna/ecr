@@ -34,9 +34,9 @@ static void ecr_bwl_wumanber_compile(void *data) {
     ecr_wm_compile(&wumanber->wm);
 }
 
-static int ecr_bwl_wumanber_add_item(void *data, const char *item, void *user) {
+static int ecr_bwl_wumanber_add_item(void *data, const char *item, int expr_id) {
     ecr_bwl_wumanber_t *wumanber = data;
-    ecr_wm_add_pattern(&wumanber->wm, item, strlen(item), user);
+    ecr_wm_add_pattern(&wumanber->wm, item, strlen(item), NULL + expr_id);
     return 0;
 }
 

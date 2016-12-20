@@ -30,12 +30,6 @@ static void ecr_bwl_free_group_item_handler(ecr_hashmap_t *map, void *key, size_
     ecr_list_destroy((ecr_list_t*) value, ecr_list_free_value_handler);
 }
 
-static void ecr_bwl_free_user_handler(ecr_hashmap_t *map, void *key, size_t key_size, void *value) {
-    ecr_bwl_user_t *user = value;
-    free_to_null(user->tag);
-    free(value);
-}
-
 static void ecr_bwl_source_free(ecr_bwl_source_t *bwsource) {
     free_to_null(bwsource->source);
     free(bwsource);
@@ -48,7 +42,8 @@ static void ecr_bwl_free_source_handler(ecr_list_t *l, int i, void *value) {
 /**
  * return -1 for error, else return 0
  */
-static int ecr_bwl_add_item(ecr_bwl_data_t *data, ecr_bwl_match_t *match, const char *nm, const char *value, void *user) {
+static int ecr_bwl_add_item(ecr_bwl_data_t *data, ecr_bwl_match_t *match, const char *nm, const char *value,
+        int expr_id) {
     ecr_bwl_group_t *group;
     int rc = 0;
 
@@ -74,7 +69,7 @@ static int ecr_bwl_add_item(ecr_bwl_data_t *data, ecr_bwl_match_t *match, const 
         group->next = data->groups;
         data->groups = group;
     }
-    group->match->add_item(group->match_data, value, user);
+    group->match->add_item(group->match_data, value, expr_id);
     free(name);
     return rc;
 }
@@ -132,27 +127,24 @@ static void ecr_bwl_expr_destroy(ecr_bwl_expr_t *expr) {
     }
 }
 
-static ecr_bwl_user_t * ecr_bwl_make_user(ecr_bwl_data_t *data, ecr_bwl_source_data_t *source_data, const char *field,
+static int ecr_bwl_get_expr_id(ecr_bwl_data_t *data, ecr_bwl_source_data_t *source_data, const char *field,
         const char *match_type, const char *group) {
     char *expr_id_key;
-    ecr_bwl_user_t *bwuser;
+    int expr_id;
 
     if (group) {
         asprintf(&expr_id_key, "%d:%s %s %s", source_data->id, field, match_type, group);
     } else {
         asprintf(&expr_id_key, "%d:%s %s", source_data->id, field, match_type);
     }
-    bwuser = ecr_hashmap_get(&data->user_map, expr_id_key, strlen(expr_id_key) + 1);
-    if (!bwuser) {
-        bwuser = malloc(sizeof(ecr_bwl_user_t));
-        bwuser->expr_id = data->next_expr_id++;
-        bwuser->tag = NULL;
-        bwuser->user = source_data->user;
-        ecr_hashmap_put(&data->user_map, expr_id_key, strlen(expr_id_key) + 1, bwuser);
+    expr_id = (int) (ecr_hashmap_get(&data->expr_id_map, expr_id_key, strlen(expr_id_key) + 1) - NULL);
+    if (!expr_id) {
+        expr_id = data->next_expr_id++;
+        ecr_hashmap_put(&data->expr_id_map, expr_id_key, strlen(expr_id_key) + 1, NULL + expr_id);
     }
     free(expr_id_key);
 
-    return bwuser;
+    return expr_id;
 }
 
 static ecr_bwl_expr_t * ecr_bwl_expr_parse_leaf(ecr_bwl_data_t *data, ecr_bwl_source_data_t *source_data, char *field,
@@ -162,7 +154,7 @@ static ecr_bwl_expr_t * ecr_bwl_expr_parse_leaf(ecr_bwl_data_t *data, ecr_bwl_so
     ecr_list_t *items;
     int i;
     ecr_bwl_expr_t *expr_new;
-    ecr_bwl_user_t *user;
+    int expr_id;
 
     if (!field) {
         ecr_bwl_log(data->bwl, LOG_ERR, "null field");
@@ -187,7 +179,7 @@ static ecr_bwl_expr_t * ecr_bwl_expr_parse_leaf(ecr_bwl_data_t *data, ecr_bwl_so
         group = NULL;
     }
 
-    user = ecr_bwl_make_user(data, source_data, field, match_type, group);
+    expr_id = ecr_bwl_get_expr_id(data, source_data, field, match_type, group);
     if (match->has_items) {
         items = ecr_hashmap_get(&source_data->item_groups, group, strlen(group));
         if (!items) {
@@ -195,23 +187,23 @@ static ecr_bwl_expr_t * ecr_bwl_expr_parse_leaf(ecr_bwl_data_t *data, ecr_bwl_so
             return NULL;
         }
         for (i = 0; i < ecr_list_size(items); i++) {
-            if (ecr_bwl_add_item(data, match, field, ecr_list_get(items, i), user) == -1) {
+            if (ecr_bwl_add_item(data, match, field, ecr_list_get(items, i), expr_id) == -1) {
                 return NULL;
             }
         }
     } else {
-        if (ecr_bwl_add_item(data, match, field, NULL, user) == -1) {
+        if (ecr_bwl_add_item(data, match, field, NULL, expr_id) == -1) {
             return NULL;
         }
     }
     expr_new = calloc(1, sizeof(ecr_bwl_expr_t));
-    expr_new->id = user->expr_id;
+    expr_new->id = expr_id;
     expr_new->logic = BWL_NONE;
     return expr_new;
 }
 
 static ecr_bwl_expr_t * ecr_bwl_expr_parse0(ecr_bwl_data_t *data, ecr_bwl_source_data_t *source_data, char **expr_save,
-        ecr_bwl_expr_t *expr_left, ecr_hashmap_t *expr_user_map) {
+        ecr_bwl_expr_t *expr_left) {
     char *token;
     ecr_bwl_expr_t *expr_new, *expr_right;
     ecr_bwl_logic_t logic;
@@ -230,7 +222,7 @@ static ecr_bwl_expr_t * ecr_bwl_expr_parse0(ecr_bwl_data_t *data, ecr_bwl_source
             ecr_bwl_log(data->bwl, LOG_ERR, "undefined logic %s at [%s]", token, *expr_save);
             return NULL;
         }
-        expr_right = ecr_bwl_expr_parse0(data, source_data, expr_save, NULL, expr_user_map);
+        expr_right = ecr_bwl_expr_parse0(data, source_data, expr_save, NULL);
         if (!expr_right) {
             return NULL;
         }
@@ -241,7 +233,7 @@ static ecr_bwl_expr_t * ecr_bwl_expr_parse0(ecr_bwl_data_t *data, ecr_bwl_source
     } else {
         if (strcmp("(", token) == 0) {
             do {
-                expr_new = ecr_bwl_expr_parse0(data, source_data, expr_save, expr_left, expr_user_map);
+                expr_new = ecr_bwl_expr_parse0(data, source_data, expr_save, expr_left);
                 if (!expr_new) {
                     return NULL;
                 }
@@ -255,7 +247,7 @@ static ecr_bwl_expr_t * ecr_bwl_expr_parse0(ecr_bwl_data_t *data, ecr_bwl_source
             ecr_bwl_log(data->bwl, LOG_ERR, "missing right brace at [%s]", *expr_save);
             return NULL;
         } else if (strcasecmp("not", token) == 0 || strcmp("!", token) == 0) {
-            expr_right = ecr_bwl_expr_parse0(data, source_data, expr_save, NULL, expr_user_map);
+            expr_right = ecr_bwl_expr_parse0(data, source_data, expr_save, NULL);
             if (!expr_right) {
                 return NULL;
             }
@@ -306,21 +298,18 @@ static int ecr_bwl_expr_parse(ecr_bwl_data_t *data, ecr_bwl_source_data_t *sourc
     ecr_bwl_expr_t *expr, *expr_new, *expr_parent;
     char *expr_str, *expr_dup, *s;
     ecr_hashmap_iter_t iter;
-    ecr_hashmap_t expr_user_map;
 
     expr_parent = NULL;
-    ecr_hashmap_init(&expr_user_map, 16, 0);
     ecr_hashmap_iter_init(&iter, &source_data->expr_map);
     while (ecr_hashmap_iter_next(&iter, NULL, NULL, (void**) &expr_str) == 0) {
         s = expr_dup = ecr_bwl_expr_normalize(expr_str);
         expr_str = ecr_str_trim(expr_str);
         expr_new = expr = NULL;
         while (*s) {
-            expr_new = ecr_bwl_expr_parse0(data, source_data, &s, expr, &expr_user_map);
+            expr_new = ecr_bwl_expr_parse0(data, source_data, &s, expr);
             if (!expr_new) {
                 free(expr_dup);
                 ecr_bwl_expr_destroy(expr);
-                ecr_hashmap_destroy(&expr_user_map, NULL);
                 return -1;
             }
             expr = expr_new;
@@ -336,7 +325,6 @@ static int ecr_bwl_expr_parse(ecr_bwl_data_t *data, ecr_bwl_source_data_t *sourc
             expr_parent = expr_new;
         }
     }
-    ecr_hashmap_destroy(&expr_user_map, NULL);
     source_data->expr = expr_parent;
     return 0;
 }
@@ -789,7 +777,7 @@ static ecr_bwl_data_t * ecr_bwl_data_new(ecr_bwl_t *list) {
     data->next_sid = 1;
     data->next_expr_id = 1;
     ecr_list_init(&data->source_list, 16);
-    ecr_hashmap_init(&data->user_map, 16, 0);
+    ecr_hashmap_init(&data->expr_id_map, 16, 0);
     return data;
 }
 
@@ -828,7 +816,7 @@ static void ecr_bwl_data_clear(ecr_bwl_data_t *data) {
     }
     data->source_data = NULL;
 
-    ecr_hashmap_clear(&data->user_map, ecr_bwl_free_user_handler);
+    ecr_hashmap_clear(&data->expr_id_map, NULL);
     ecr_list_clear(&data->source_list, ecr_bwl_free_source_handler);
     data->next_expr_id = 1;
     data->next_sid = 1;
@@ -838,7 +826,7 @@ static void ecr_bwl_data_destroy(ecr_bwl_data_t *data) {
     if (data) {
         ecr_bwl_data_clear(data);
         ecr_list_destroy(&data->source_list, ecr_bwl_free_source_handler);
-        ecr_hashmap_destroy(&data->user_map, ecr_bwl_free_user_handler);
+        ecr_hashmap_destroy(&data->expr_id_map, NULL);
         free_to_null(data);
     }
 }
@@ -1185,9 +1173,9 @@ void ecr_bwl_dump(ecr_bwl_t *list, FILE *stream) {
     ecr_bwl_data_t *data;
     ecr_bwl_source_data_t *source_data;
     ecr_bwl_group_t *group;
-    ecr_bwl_user_t *user;
     ecr_hashmap_iter_t iter;
     char *expr_user_key;
+    void *value;
     size_t size;
 
     data = list->data;
@@ -1202,9 +1190,9 @@ void ecr_bwl_dump(ecr_bwl_t *list, FILE *stream) {
     }
 
     fprintf(stream, "\n--- expression id map ---\n");
-    ecr_hashmap_iter_init(&iter, &data->user_map);
-    while (ecr_hashmap_iter_next(&iter, (void*) &expr_user_key, NULL, (void**) &user) == 0) {
-        fprintf(stream, "%d:\t{group=[%s], user=%p}\n", user->expr_id, expr_user_key, user->user);
+    ecr_hashmap_iter_init(&iter, &data->expr_id_map);
+    while (ecr_hashmap_iter_next(&iter, (void*) &expr_user_key, NULL, (void**) &value) == 0) {
+        fprintf(stream, "%d:\t{group=[%s]}\n", (int) (value - NULL), expr_user_key);
     }
 
     fprintf(stream, "\n--- expressions ---\n");
