@@ -131,6 +131,7 @@ extern ecr_bwl_match_t ecr_bwl_equals;
 extern ecr_bwl_match_t ecr_bwl_wumanber;
 extern ecr_bwl_match_t ecr_bwl_exists;
 extern ecr_bwl_match_t ecr_bwl_regex;
+extern ecr_bwl_match_t ecr_bwl_urlmatch;
 
 int ecr_bwl_init(ecr_bwl_t *list, ecr_bwl_opt_t *opt);
 
