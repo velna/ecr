@@ -145,25 +145,31 @@ void ecr_test_buf(int n) {
     printf("\n");
 }
 
-void test_bwlist(const char *bwlist_file) {
+void test_bwlist(const char *bwlist_file, const char * in) {
     ecr_bwl_t bwlist;
     ecr_bwl_opt_t bwopt = { 0 };
     int id = 0, i;
     ecr_fixedhash_ctx_t ctx;
     ecr_fixedhash_t *hash;
     char mem[4096];
-    ecr_str_t host, uri;
+    ecr_str_t host, uri, url;
     ecr_bwl_result_t *result;
 
     ecr_fixedhash_ctx_init(&ctx);
-    ecr_fixedhash_ctx_add_keys(&ctx, "host,uri");
+    ecr_fixedhash_ctx_add_keys(&ctx, "host,uri,url");
     hash = ecr_fixedhash_init(&ctx, mem, 4096);
+
     host.ptr = "www.sabc.com";
     host.len = strlen(host.ptr);
     ecr_fixedhash_put_original(hash, "host", 4, &host);
+
     uri.ptr = "/abdc.html";
     uri.len = strlen(uri.ptr);
     ecr_fixedhash_put_original(hash, "uri", 3, &uri);
+
+    url.ptr = (char*) in;
+    url.len = strlen(url.ptr);
+    ecr_fixedhash_put_original(hash, "url", 3, &url);
 
     bwopt.basepath = NULL;
     bwopt.fixedhash_ctx = &ctx;
@@ -387,11 +393,11 @@ void test_urlmatch(int argc, char ** argv) {
 
     ecr_str_t path;
     path.ptr = argv[argc - 1];
-    path.len = (path.ptr);
+    path.len = strlen(path.ptr);
 
     u_int64_t start = ecr_current_time();
     for (i = 0; i < n; i++) {
-        rc = ecr_urlmatch_match(&m, &path);
+        rc = ecr_urlmatch_match(&m, &path, NULL);
     }
     u_int64_t end = ecr_current_time();
 
@@ -402,6 +408,7 @@ void test_urlmatch(int argc, char ** argv) {
 }
 
 int main(int argc, char **argv) {
-    test_urlmatch(argc, argv);
+//    test_urlmatch(argc, argv);
+    test_bwlist(argv[1], argv[2]);
     return EXIT_SUCCESS;
 }

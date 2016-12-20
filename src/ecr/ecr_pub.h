@@ -12,13 +12,14 @@
 #include "ecr_config.h"
 #include "ecr_io.h"
 #include "ecr_counter.h"
+#include <pcap.h>
 #include <pthread.h>
 #include <librdkafka/rdkafka.h>
 
 #define ECR_PUB_CODEC_NONE  -1
 
 typedef enum {
-    ECR_PUB_STAT, ECR_PUB_ZMQ, ECR_PUB_FILE, ECR_PUB_KAFKA
+    ECR_PUB_STAT, ECR_PUB_ZMQ, ECR_PUB_FILE, ECR_PUB_KAFKA, ECR_PUB_PACKET
 } ecr_pub_type_t;
 
 typedef struct {
@@ -36,6 +37,9 @@ typedef struct {
             const char *brokers;
             const char *topic;
         } kafka;
+        struct {
+            const char *device;
+        } packet;
     };
     const char *format;
     ecr_config_t *config;
@@ -65,6 +69,9 @@ typedef struct ecr_pub_output_s {
             rd_kafka_t *kafka;
             rd_kafka_topic_t *topic;
         } kafka;
+        struct {
+            pcap_t *pcap;
+        } packet;
     };
     struct ecr_pub_output_s *next;
 } ecr_pub_output_t;
@@ -106,7 +113,9 @@ int ecr_pub_output_config(ecr_pub_t *pub, ecr_config_t *config);
 
 int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *output_config, ecr_config_t *config);
 
-void ecr_pub(ecr_pub_t *pub, void *data, int tid);
+void ecr_pub_key(ecr_pub_t *pub, void *data, void *key, size_t key_len, int tid);
+
+#define ecr_pub(pub, data, tid) ecr_pub_key(pub, data, NULL, 0, tid)
 
 void ecr_pub_destroy(ecr_pub_t *pub);
 

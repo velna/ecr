@@ -97,7 +97,8 @@ void ecr_urlmatch_addpattern(ecr_urlmatch_t * in, ecr_str_t * pattern) {
 
     ecr_urlmatch_url_t * u = calloc(1, sizeof(ecr_urlmatch_url_t));
     u->size = size;
-    u->str = strndup(pattern->ptr, pattern->len);
+    u->pattern.ptr = strndup(pattern->ptr, pattern->len);
+    u->pattern.len = pattern->len;
     u->next = head.next;
     ecr_list_add(list, u);
 
@@ -115,7 +116,7 @@ void ecr_urlmatch_print(ecr_urlmatch_t * in, FILE* out) {
         fprintf(out, "====[%.*s]===\n", (int) host.len, host.ptr);
         for (i = 0; i < ecr_list_size(list); i++) {
             ecr_urlmatch_url_t * u = ecr_list_get(list, i);
-            fprintf(out, "[size: %d]%s\n", u->size, u->str);
+            fprintf(out, "[size: %d]%s\n", u->size, u->pattern.ptr);
             ecr_urlmatch_node_t * next = u->next;
             while (next) {
                 fprintf(out, "i: %d, str: %s", next->index, next->str);
@@ -136,7 +137,7 @@ void ecr_urlmatch_print(ecr_urlmatch_t * in, FILE* out) {
     }
 }
 
-int ecr_urlmatch_match(ecr_urlmatch_t * in, ecr_str_t * url) {
+int ecr_urlmatch_match(ecr_urlmatch_t * in, ecr_str_t * url, ecr_str_t ** pattern) {
     ecr_hashmap_t * map = in;
 
     int ret = 0, i, size;
@@ -180,6 +181,9 @@ int ecr_urlmatch_match(ecr_urlmatch_t * in, ecr_str_t * url) {
             }
             if (ok) {
                 ret = 1;
+                if (pattern) {
+                    *pattern = &u->pattern;
+                }
                 break;
             }
         }
@@ -207,7 +211,7 @@ static void ecr_urlmatch_url_handler(ecr_list_t *list, int i, void* value) {
         free(next);
         next = nnext;
     }
-    free(u->str);
+    free(u->pattern.ptr);
     free(u);
 }
 

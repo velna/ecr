@@ -24,7 +24,6 @@ int ecr_counter_ctx_init(ecr_counter_ctx_t *ctx) {
     memset(ctx, 0, sizeof(ecr_counter_ctx_t));
     ecr_list_init(&ctx->counters, 16);
     ecr_hashmap_init(&ctx->countermap, 16, 0);
-    ctx->init_timestamp = ctx->last_timestamp = ecr_current_time();
     return 0;
 }
 
@@ -37,6 +36,7 @@ ecr_counter_t * ecr_counter_create(ecr_counter_ctx_t *ctx, const char *group, co
         ctr->name = strdup(name);
         ctr->group = strdup(DEFAULT_GROUP);
     }
+    ctr->init_timestamp = ctr->last_timestamp = ecr_current_time();
     ctr->opt = opt;
     ecr_list_add(&ctx->counters, ctr);
     ecr_hashmap_put(&ctx->countermap, ctr->name, strlen(ctr->name), ctr);
@@ -130,6 +130,11 @@ void ecr_counter_reset_group(ecr_counter_ctx_t *ctx, const char *group) {
     }
 }
 
+void ecr_counter_clear(ecr_counter_t *counter) {
+    AO_store_full(&counter->value, counter->snapshot = counter->last = 0);
+    counter->init_timestamp = counter->snapshot_timestamp = counter->last_timestamp = ecr_current_time();
+}
+
 void ecr_counter_reset(ecr_counter_ctx_t *ctx) {
     int i;
     ecr_counter_t *ctr;
@@ -145,10 +150,13 @@ void ecr_counter_reset(ecr_counter_ctx_t *ctx) {
 void ecr_counter_snapshot(ecr_counter_ctx_t *ctx) {
     int i;
     ecr_counter_t * ctr;
+    uint64_t now = ecr_current_time();
     for (i = 0; i < ecr_list_size(&ctx->counters); i++) {
         if ((ctr = ecr_list_get(&ctx->counters, i)) != NULL) {
             ctr->last = ctr->snapshot;
+            ctr->last_timestamp = ctr->snapshot_timestamp;
             ctr->snapshot = ctr->value;
+            ctr->snapshot_timestamp = now;
         }
     }
 }
@@ -168,16 +176,9 @@ int ecr_counter_print_all(ecr_counter_ctx_t *ctx, FILE *stream) {
 int ecr_counter_print(ecr_counter_ctx_t *ctx, FILE *stream) {
     int i, rc = 0;
     ecr_counter_t *ctr;
-    uint64_t now = ecr_current_time();
-    int64_t diff_total = (now - ctx->init_timestamp) / 1000, diff = (now - ctx->last_timestamp) / 1000;
+    int64_t diff_total, diff;
     int64_t avg, inst;
 
-    if (diff_total == 0) {
-        diff_total = 1;
-    }
-    if (diff == 0) {
-        diff = 1;
-    }
     for (i = 0; i < ecr_list_size(&ctx->counters); i++) {
         if ((ctr = ecr_list_get(&ctx->counters, i)) != NULL) {
             if ((ctr->opt & ECR_COUNTER_NO_PRINT) || !ctr->snapshot) {
@@ -186,6 +187,14 @@ int ecr_counter_print(ecr_counter_ctx_t *ctx, FILE *stream) {
             if (ctr->opt & ECR_COUNTER_TOTAL_ONLY) {
                 rc += fprintf(stream, "%s:\t%lu\n", ctr->name, ctr->snapshot);
             } else {
+                diff_total = (ctr->snapshot_timestamp - ctr->init_timestamp) / 1000;
+                if (diff_total == 0) {
+                    diff_total = 1;
+                }
+                diff = (ctr->snapshot_timestamp - ctr->last_timestamp) / 1000;
+                if (diff == 0) {
+                    diff = 1;
+                }
                 avg = ctr->snapshot / diff_total;
                 inst = (ctr->snapshot > ctr->last ? ctr->snapshot - ctr->last : -(int64_t) (ctr->last - ctr->snapshot))
                         / diff;
@@ -193,7 +202,6 @@ int ecr_counter_print(ecr_counter_ctx_t *ctx, FILE *stream) {
             }
         }
     }
-    ctx->last_timestamp = now;
     return rc;
 }
 

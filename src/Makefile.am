@@ -1,3 +1,14 @@
+bin_PROGRAMS = xcmd
+
+xcmd_SOURCES = ecr/ecr_xcmd_main.c
+
+xcmd_CFLAGS	=-Wall $(shell pkg-config --cflags libmongoc-1.0)
+xcmd_LDADD		= \
+	/usr/local/lib/libecr.a \
+	/usr/local/lib/libzmq.a
+
+xcmd_LDFLAGS	=-lpthread -latomic_ops -lrt -lcrypto -lstdc++
+
 #######################################
 # The list of libraries we are building seperated by spaces.
 # The 'lib_' indicates that these build products will be installed
@@ -48,6 +59,11 @@ libecr_la_SOURCES = \
 	ecr/ecr_bloomfilter.c \
 	ecr/ecr_buf.c \
 	ecr/ecr_bwlist.c \
+	ecr/ecr_bwlist_equals.c \
+	ecr/ecr_bwlist_wumanber.c \
+	ecr/ecr_bwlist_exists.c \
+	ecr/ecr_bwlist_regex.c \
+	ecr/ecr_bwlist_urlmatch.c \
 	ecr/ecr_cmd.c \
 	ecr/ecr_config.c \
 	ecr/ecr_counter.c \

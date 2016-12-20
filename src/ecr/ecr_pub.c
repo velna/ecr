@@ -14,6 +14,10 @@
 #include <string.h>
 #include <errno.h>
 #include <zmq.h>
+#include <net/if.h>
+#include <linux/if_ether.h>
+#include <linux/if_packet.h>
+#include <net/ethernet.h>
 
 int ecr_pub_init(ecr_pub_t *pub, const char *id, ecr_pub_config_t *config) {
     int i;
@@ -35,6 +39,7 @@ int ecr_pub_output_config(ecr_pub_t *pub, ecr_config_t *config) {
     ecr_pub_output_config_t file_config = { .type = ECR_PUB_FILE };
     ecr_pub_output_config_t zmq_config = { .type = ECR_PUB_ZMQ };
     ecr_pub_output_config_t kafka_config = { .type = ECR_PUB_KAFKA };
+    ecr_pub_output_config_t packet_config = { .type = ECR_PUB_PACKET };
     ecr_config_line_t config_lines[] = {
     //
             { "file_format", &file_config.format, ECR_CFG_STRING }, //
@@ -46,6 +51,8 @@ int ecr_pub_output_config(ecr_pub_t *pub, ecr_config_t *config) {
             { "kafka_format", &kafka_config.format, ECR_CFG_STRING }, //
             { "kafka_brokers", &kafka_config.kafka.brokers, ECR_CFG_STRING }, //
             { "kafka_topic", &kafka_config.kafka.topic, ECR_CFG_STRING }, //
+            { "packet_format", &packet_config.format, ECR_CFG_STRING }, //
+            { "packet_device", &packet_config.packet.device, ECR_CFG_STRING }, //
             { 0 } };
 
     ecr_config_load(config, pub->id, config_lines);
@@ -70,6 +77,13 @@ int ecr_pub_output_config(ecr_pub_t *pub, ecr_config_t *config) {
             ok++;
         }
     }
+    if (packet_config.format && packet_config.packet.device) {
+        if (ecr_pub_output_add(pub, &packet_config, config)) {
+            error++;
+        } else {
+            ok++;
+        }
+    }
     if (!ok) {
         if (ecr_pub_output_add(pub, &stat_config, config)) {
             error++;
@@ -83,6 +97,7 @@ int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *output_config, e
     int i, j;
     char *fp, *s, errstr[512], *id;
     FILE *file;
+    char errbuf[PCAP_ERRBUF_SIZE];
 
     switch (output_config->type) {
     case ECR_PUB_STAT:
@@ -189,6 +204,24 @@ int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *output_config, e
         L_INFO("%s: add kafka output: %s@%s.", pub->id, output_config->kafka.topic, output_config->kafka.brokers);
         free(id);
         break;
+    case ECR_PUB_PACKET:
+        output->packet.pcap = pcap_create(output_config->packet.device, errbuf);
+        if (!output->packet.pcap) {
+            L_ERROR("error open device %s for output: %s", output_config->packet.device, errbuf);
+            free(output);
+            return -1;
+        }
+        if (pcap_activate(output->packet.pcap) != 0) {
+            L_ERROR("pcap_activate() error: %s", pcap_geterr(output->packet.pcap));
+            free(output);
+            return -1;
+        }
+        output->ok = ecr_counter_create(pub->config.cctx, pub->id, "packet_ok", 0);
+        output->error = ecr_counter_create(pub->config.cctx, pub->id, "packet_error", 0);
+        output->bytes_ok = ecr_counter_create(pub->config.cctx, pub->id, "packet_bytes_ok", 0);
+        output->bytes_error = ecr_counter_create(pub->config.cctx, pub->id, "packet_bytes_error", 0);
+        L_INFO("%s: add packet output: %s.", pub->id, output_config->packet.device);
+        break;
     default:
         L_ERROR("%s: unknown pub type: %d", pub->id, output_config->type);
         free(output);
@@ -225,7 +258,7 @@ int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *output_config, e
     return 0;
 }
 
-void ecr_pub(ecr_pub_t *pub, void *data, int tid) {
+void ecr_pub_key(ecr_pub_t *pub, void *data, void *key, size_t key_len, int tid) {
     ecr_pub_output_t *output = pub->outputs;
     ecr_str_t *buf = &pub->buf_array[tid];
     FILE *stream = pub->stream_array[tid];
@@ -237,34 +270,41 @@ void ecr_pub(ecr_pub_t *pub, void *data, int tid) {
             rewind(stream);
             pub->config.write_cb(pub, output, stream, data, tid);
             fflush(stream);
-            switch (output->type) {
-            case ECR_PUB_ZMQ:
-                pthread_mutex_lock(&output->zmq.lock);
-                if (zmq_send(output->zmq.skt, buf->ptr, buf->len, ZMQ_DONTWAIT) == -1) {
-                    ok = 0;
+            if (buf->len) {
+                switch (output->type) {
+                case ECR_PUB_ZMQ:
+                    pthread_mutex_lock(&output->zmq.lock);
+                    if (zmq_send(output->zmq.skt, buf->ptr, buf->len, ZMQ_DONTWAIT) == -1) {
+                        ok = 0;
+                    }
+                    pthread_mutex_unlock(&output->zmq.lock);
+                    break;
+                case ECR_PUB_FILE:
+                    if (fwrite(buf->ptr, buf->len, 1,
+                            output->file.array[tid * output->file.split + output->file.idx_array[tid]]) != 1) {
+                        ok = 0;
+                    }
+                    if (++output->file.idx_array[tid] == output->file.split) {
+                        output->file.idx_array[tid] = 0;
+                    }
+                    break;
+                case ECR_PUB_KAFKA:
+                    if (rd_kafka_produce(output->kafka.topic, RD_KAFKA_PARTITION_UA, RD_KAFKA_MSG_F_COPY, buf->ptr,
+                            buf->len, key, key_len, (NULL))) {
+                        ok = 0;
+                    }
+                    rd_kafka_poll(output->kafka.kafka, 0);
+                    break;
+                case ECR_PUB_PACKET:
+                    if (pcap_sendpacket(output->packet.pcap, (u_char*) buf->ptr, (int) buf->len)) {
+                        ok = 0;
+                    }
+                    break;
+                default:
+                    break;
                 }
-                pthread_mutex_unlock(&output->zmq.lock);
-                break;
-            case ECR_PUB_FILE:
-                if (fwrite(buf->ptr, buf->len, 1,
-                        output->file.array[tid * output->file.split + output->file.idx_array[tid]]) != 1) {
-                    ok = 0;
-                }
-                if (++output->file.idx_array[tid] == output->file.split) {
-                    output->file.idx_array[tid] = 0;
-                }
-                break;
-            case ECR_PUB_KAFKA:
-                if (rd_kafka_produce(output->kafka.topic, RD_KAFKA_PARTITION_UA, RD_KAFKA_MSG_F_COPY, buf->ptr,
-                        buf->len, (NULL), 0, (NULL))) {
-                    ok = 0;
-                }
-                rd_kafka_poll(output->kafka.kafka, 0);
-                break;
-            default:
-                break;
+                ecr_counter_add(ok ? output->bytes_ok : output->bytes_error, buf->len);
             }
-            ecr_counter_add(ok ? output->bytes_ok : output->bytes_error, buf->len);
         }
         ecr_counter_incr(ok ? output->ok : output->error);
         output = output->next;
@@ -317,6 +357,11 @@ void ecr_pub_destroy(ecr_pub_t *pub) {
             }
             ecr_counter_delete(pub->config.cctx, pub->id, "kafka_ok");
             ecr_counter_delete(pub->config.cctx, pub->id, "kafka_bytes");
+            break;
+        case ECR_PUB_PACKET:
+            if (output->packet.pcap) {
+                pcap_close(output->packet.pcap);
+            }
             break;
         }
         free_to_null(output->format);
