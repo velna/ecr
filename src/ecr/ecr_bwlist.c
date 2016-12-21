@@ -989,6 +989,7 @@ int ecr_bwl_init(ecr_bwl_t *list, ecr_bwl_opt_t *opt) {
     ecr_hashmap_put(&list->match_map, ecr_bwl_wumanber.name, strlen(ecr_bwl_wumanber.name), &ecr_bwl_wumanber);
     ecr_hashmap_put(&list->match_map, ecr_bwl_exists.name, strlen(ecr_bwl_exists.name), &ecr_bwl_exists);
     ecr_hashmap_put(&list->match_map, ecr_bwl_regex.name, strlen(ecr_bwl_regex.name), &ecr_bwl_regex);
+    ecr_hashmap_put(&list->match_map, ecr_bwl_urlmatch.name, strlen(ecr_bwl_urlmatch.name), &ecr_bwl_urlmatch);
 
     pthread_mutex_init(&list->lock, NULL);
     list->data = ecr_bwl_data_new(list);

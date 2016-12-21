@@ -63,6 +63,7 @@ libecr_la_SOURCES = \
 	ecr/ecr_bwlist_wumanber.c \
 	ecr/ecr_bwlist_exists.c \
 	ecr/ecr_bwlist_regex.c \
+	ecr/ecr_bwlist_urlmatch.c \
 	ecr/ecr_cmd.c \
 	ecr/ecr_config.c \
 	ecr/ecr_counter.c \
