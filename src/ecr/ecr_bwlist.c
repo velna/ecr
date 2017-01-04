@@ -477,7 +477,7 @@ static int ecr_bwl_load_stream(ecr_bwl_data_t *data, FILE *stream, ecr_bwl_sourc
     source_data = ecr_bwl_source_data_init(source);
     while ((nread = getline(&line, &len, stream)) > 0) {
         ln++;
-        if (nread == 0 || line[0] == '#' || line[0] == '\n') {
+        if (nread == 0 || line[0] == '#' || line[0] == '\n' || (nread > 1 && line[0] == '\r' && line[1] == '\n')) {
             continue;
         }
         free_to_null(oline);
@@ -486,8 +486,8 @@ static int ecr_bwl_load_stream(ecr_bwl_data_t *data, FILE *stream, ecr_bwl_sourc
         if (isblank(ch)) {
             if (name == NULL || !group_items) {
                 rc = -1;
-                ecr_bwl_log(data->bwl, LOG_ERR, "ecr_bwlist syntax error, no group found at line %d: %s", ln,
-                        source->source);
+                ecr_bwl_log(data->bwl, LOG_ERR, "ecr_bwlist syntax error, no group found at %s line %d: [%s]",
+                        source->source, ln, line);
                 break;
             }
             value = ecr_str_trim(line);
