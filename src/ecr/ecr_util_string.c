@@ -114,3 +114,23 @@ inline size_t ecr_mem_rcspn(const void *mem, size_t n, const char *stopset) {
     }
     return s - (const char*) mem;
 }
+
+ecr_str_t* ecr_str_dup(ecr_str_t *to, ecr_str_t *from) {
+    ecr_str_t *ret = to;
+    if (!from || !from->ptr) {
+        return NULL;
+    }
+    if (!to) {
+        ret = malloc(sizeof(ecr_str_t));
+    }
+    ret->ptr = malloc(from->len);
+    if (!ret->ptr) {
+        if (!to) {
+            free(ret);
+        }
+        return NULL;
+    }
+    memcpy(ret->ptr, from->ptr, from->len);
+    ret->len = from->len;
+    return ret;
+}

@@ -185,6 +185,8 @@ char *ecr_str_trim(char *s);
 
 char *ecr_str_tolower(char *s);
 
+ecr_str_t* ecr_str_dup(ecr_str_t *to, ecr_str_t *from);
+
 size_t ecr_str_rcspn(const char *s, size_t n, const char *stopset);
 
 size_t ecr_mem_cspn(const void *mem, size_t n, const char *stopset);
