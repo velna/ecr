@@ -302,8 +302,8 @@ static int ecr_bwl_expr_parse(ecr_bwl_data_t *data, ecr_bwl_source_data_t *sourc
     expr_parent = NULL;
     ecr_hashmap_iter_init(&iter, &source_data->expr_map);
     while (ecr_hashmap_iter_next(&iter, NULL, NULL, (void**) &expr_str) == 0) {
-        s = expr_dup = ecr_bwl_expr_normalize(expr_str);
-        expr_str = ecr_str_trim(expr_str);
+        expr_dup = ecr_bwl_expr_normalize(expr_str);
+        s = ecr_str_trim(expr_dup);
         expr_new = expr = NULL;
         while (*s) {
             expr_new = ecr_bwl_expr_parse0(data, source_data, &s, expr);
@@ -892,6 +892,11 @@ static int ecr_bwl_compile_0(ecr_bwl_data_t *data, int force) {
             rc = ecr_bwl_load_string(data, bwsource, 1);
             break;
         default:
+            ecr_bwl_data_clear(data);
+            ecr_list_destroy(&unmodified_sources, NULL);
+            return -1;
+        }
+        if (rc == -1) {
             ecr_bwl_data_clear(data);
             ecr_list_destroy(&unmodified_sources, NULL);
             return -1;

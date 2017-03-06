@@ -153,7 +153,7 @@ int ecr_app_init(ecr_app_t *app, int argc, char **argv) {
         app->log_file = ecr_logger_init(app->config.log_file);
     }
 
-    if (app->config.log_file != NULL) {
+    if (app->config.stat_log_file != NULL) {
         app->stat_log_file = ecr_logger_open(app->config.stat_log_file);
     } else {
         app->stat_log_file = ECR_LOG_FILE;

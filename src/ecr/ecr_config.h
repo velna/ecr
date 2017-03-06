@@ -71,6 +71,10 @@ int ecr_config_get(ecr_config_t *cfg, const char *group, const char *name, enum 
 
 int ecr_config_put(ecr_config_t *cfg, const char *group, const char *name, enum ecr_config_type type, const void *value);
 
+/**
+ * return a char* array contains all config names, end with a null pointer.<br/>
+ * caller must free the returned char** pointer using free().
+ */
 char ** ecr_config_names(ecr_config_t *cfg);
 
 int ecr_config_load(ecr_config_t *cfg, const char *group, ecr_config_line_t *lines);
