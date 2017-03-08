@@ -13,10 +13,12 @@
 #include <sys/types.h>
 
 #define free_to_null(p) \
-    if(p) { \
-        free(p); \
-        (p) = NULL; \
-    }
+    do { \
+        if(p) { \
+            free(p); \
+            (p) = NULL; \
+        } \
+    } while(0)
 
 typedef struct {
     char * ptr;

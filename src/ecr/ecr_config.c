@@ -237,7 +237,7 @@ char ** ecr_config_names(ecr_config_t *cfg) {
     ret = calloc(ecr_hashmap_size(&cfg->properties) + 1, sizeof(char*));
     ecr_hashmap_iter_init(&iter, &cfg->properties);
     while (ecr_hashmap_iter_next(&iter, (void**) &name, NULL, NULL) == 0) {
-        ret[i] = name;
+        ret[i++] = name;
     }
     return ret;
 }
