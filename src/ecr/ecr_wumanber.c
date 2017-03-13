@@ -165,23 +165,30 @@ int ecr_wm_add_pattern(ecr_wm_t *wm, const char *pattern, size_t len, void *user
     return 0;
 }
 
+static int ecr_wm_sort_func(const void *a, const void *b) {
+    const ecr_wm_pattern_t *pa = a, *pb = b;
+    int ha = pa->hash, hb = pb->hash;
+    return hb - ha;
+}
+
 static void ecr_wm_sort(ecr_wm_t * wm) {
-    int i, j, f;
-    ecr_wm_pattern_t tmp;
+    int i; //, j, f;
+//    ecr_wm_pattern_t tmp;
     for (i = 0; i < wm->plist_size; i++) {
         wm->plist[i].hash = WM_HASH(wm->plist[i].pattern.ptr + wm->min_len - WM_MIN_BLOCK);
     }
-    for (i = wm->plist_size - 1, f = 1; i >= 0 && f; i--) {
-        f = 0;
-        for (j = 0; j < i; j++) {
-            if (wm->plist[j + 1].hash < wm->plist[j].hash) {
-                f = 1;
-                memcpy(&tmp, &(wm->plist[j + 1]), sizeof(ecr_wm_pattern_t));
-                memcpy(&(wm->plist[j + 1]), &(wm->plist[j]), sizeof(ecr_wm_pattern_t));
-                memcpy(&(wm->plist[j]), &tmp, sizeof(ecr_wm_pattern_t));
-            }
-        }
-    }
+    qsort(wm->plist, wm->plist_size, sizeof(ecr_wm_pattern_t), ecr_wm_sort_func);
+//    for (i = wm->plist_size - 1, f = 1; i >= 0 && f; i--) {
+//        f = 0;
+//        for (j = 0; j < i; j++) {
+//            if (wm->plist[j + 1].hash < wm->plist[j].hash) {
+//                f = 1;
+//                memcpy(&tmp, &(wm->plist[j + 1]), sizeof(ecr_wm_pattern_t));
+//                memcpy(&(wm->plist[j + 1]), &(wm->plist[j]), sizeof(ecr_wm_pattern_t));
+//                memcpy(&(wm->plist[j]), &tmp, sizeof(ecr_wm_pattern_t));
+//            }
+//        }
+//    }
 }
 
 static void ecr_wm_calc_shift(ecr_wm_t * wm) {

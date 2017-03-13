@@ -41,7 +41,8 @@ static void ecr_server_cmd_send(ecr_server_worker_t *worker, int cmd_code, void 
     cmd->code = cmd_code;
     cmd->data = data;
     pthread_mutex_lock(&cmd_chain->mutex);
-    linked_list_push(cmd_chain, cmd);
+    linked_list_push(cmd_chain, cmd)
+    ;
     pthread_mutex_unlock(&cmd_chain->mutex);
     uv_async_send(worker->cmd_ctx.async);
 }
@@ -258,6 +259,7 @@ static void * ecr_server_worker_routine(void *user) {
 
 int ecr_server_listen(ecr_server_t *server, int backlog) {
     int i;
+    cpu_set_t mask;
 
     unlink(server->config.pipe_file_path);
     uv_pipe_bind(server->master.pipe, server->config.pipe_file_path);
@@ -268,6 +270,11 @@ int ecr_server_listen(ecr_server_t *server, int backlog) {
     for (i = 0; i < server->config.num_workers; i++) {
         ecr_server_worker_init(server, &server->workers[i], i);
         pthread_create(&server->workers[i].thread, NULL, ecr_server_worker_routine, &server->workers[i]);
+        CPU_ZERO(&mask);
+        CPU_SET(i + 4, &mask);
+        if (pthread_setaffinity_np(server->workers[i].thread, sizeof(cpu_set_t), &mask) == -1) {
+            L_ERROR("pthread_setaffinity_np() failed: %s, cpu_num: %d", strerror(errno), i + 4);
+        }
     }
 
     uv_listen((uv_stream_t*) server->master_socket, backlog, ecr_server_master_connection_cb);
