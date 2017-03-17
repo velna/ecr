@@ -7,6 +7,7 @@
 
 #include "config.h"
 #include "ecr_radius.h"
+#include "ecr_util.h"
 #include <stdlib.h>
 #include <string.h>
 #include <netinet/in.h>
@@ -48,6 +49,24 @@ ecr_radius_t * ecr_radius_parse(u_char* p, size_t size) {
     }
     rds->attrs = ecr_parse_attr(p + RADIUS_HDR_LEN, len - RADIUS_HDR_LEN, 0);
     return rds;
+}
+
+void ecr_radius_dump(ecr_radius_t * rds, FILE *out) {
+    ecr_radius_attr_t * attr = rds->attrs;
+    while (attr) {
+        if (attr->type == RADIUS_ATTR_VENDOR_SPECIFIC) {
+            ecr_radius_attr_t *vendor_attr = attr->vendor_attr;
+            while (vendor_attr) {
+                fprintf(out, "vendor.type=%hhu, len=%hhu\n", vendor_attr->type, vendor_attr->value_len);
+                ecr_binary_dump(out, vendor_attr->value, vendor_attr->value_len);
+                vendor_attr = vendor_attr->next;
+            }
+        } else {
+            fprintf(out, "type=%hhu, len=%hhu\n", attr->type, attr->value_len);
+            ecr_binary_dump(out, attr->value, attr->value_len);
+        }
+        attr = attr->next;
+    }
 }
 
 void ecr_radius_destroy(ecr_radius_t * rds) {

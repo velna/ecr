@@ -9,6 +9,7 @@
 #define ECR_RADIUS_H_
 
 #include "ecrconf.h"
+#include <stdio.h>
 
 #define RADIUS_CODE_ACCESS_REQUEST			1
 #define RADIUS_CODE_ACCESS_ACCEPT			2
@@ -116,6 +117,8 @@ typedef struct {
 } ecr_radius_t;
 
 ecr_radius_t * ecr_radius_parse(u_char *p, size_t size);
+
+void ecr_radius_dump(ecr_radius_t * rds, FILE *out);
 
 void ecr_radius_destroy(ecr_radius_t *rds);
 
