@@ -88,6 +88,12 @@ static int ecr_http_token_line(ecr_str_t *to, ecr_str_t *data) {
     }
 }
 
+/**
+ * return -2 for \r\n at very begin of data
+ * return -1 for no key or value
+ * return 0 for complete key and value
+ * return 1 for incomplete value
+ */
 static int ecr_http_token_kv(ecr_str_t *key_out, ecr_str_t *value_out, ecr_str_t *data) {
     char *s = data->ptr, *end = data->ptr + data->len;
     int sp;
@@ -101,15 +107,24 @@ static int ecr_http_token_kv(ecr_str_t *key_out, ecr_str_t *value_out, ecr_str_t
     while (s < end && (*s == ' ' || *s == '\t')) {
         s++;
     }
+    if (s >= end) {
+        return -1;
+    }
     key.ptr = s;
     while (s < end && *s != ':') {
         *s = (char) tolower(*s);
         s++;
     }
+    if (s >= end) {
+        return -1;
+    }
     key.len = s - key.ptr;
     s++;
     while (s < end && (*s == ' ' || *s == '\t')) {
         s++;
+    }
+    if (s >= end) {
+        return -1;
     }
     value.ptr = s;
     sp = 0;
@@ -122,6 +137,9 @@ static int ecr_http_token_kv(ecr_str_t *key_out, ecr_str_t *value_out, ecr_str_t
         s++;
     }
     value.len = s - value.ptr - sp;
+    if (value.len == 0) {
+        return -1;
+    }
     *key_out = key;
     *value_out = value;
     if (s + 1 < end) {
@@ -129,7 +147,7 @@ static int ecr_http_token_kv(ecr_str_t *key_out, ecr_str_t *value_out, ecr_str_t
         data->ptr = s + 2;
         return 0;
     } else {
-        return -1;
+        return 1;
     }
 }
 
@@ -461,7 +479,8 @@ int ecr_http_decode(ecr_http_message_t *message, char *ptr, size_t size) {
                 }
             } else {
                 // put the header into headers no matter the header is complete
-                if (buf && ecr_fixedhash_put_original(message->headers, key.ptr, key.len, &buf->data) == 0) {
+                if (token_rc >= 0 && buf
+                        && ecr_fixedhash_put_original(message->headers, key.ptr, key.len, &buf->data) == 0) {
                     buf->type = HTTP_BUF_HEADER;
                 }
                 if (token_rc) {
