@@ -116,7 +116,7 @@ struct ecr_pcap_s {
     ecr_pcap_cfg_t config;
     volatile AO_t close_confirm;
     int active :1;
-    int closed :1;
+    volatile int closed;
     union {
 #ifdef ECR_ENABLE_PFRING
         ecr_pcap_pfringmc_t pfringmc;
