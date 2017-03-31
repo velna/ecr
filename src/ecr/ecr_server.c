@@ -14,23 +14,57 @@
 
 #define CMD_CODE_SHUTDOWN           1
 
+#define ecr_uv_close(handle, cb) \
+    switch ((handle)->type) { \
+    case UV_NAMED_PIPE: \
+        L_DEBUG("close named pipe: %d", ((uv_pipe_t*)handle)->io_watcher.fd); \
+        break; \
+    case UV_TCP: \
+        L_DEBUG("close tcp: %d", ((uv_tcp_t*)handle)->io_watcher.fd); \
+        break; \
+    case UV_STREAM: \
+        L_DEBUG("clse stream: %d", ((uv_stream_t*)handle)->io_watcher.fd); \
+        break; \
+    default: \
+        L_DEBUG("close handle of type %d", (handle)->type); \
+        break; \
+    } \
+    uv_close((handle), cb); \
+
+
 void ecr_server_close_cb(uv_handle_t *handle) {
+    switch (handle->type) {
+    case UV_NAMED_PIPE:
+        L_DEBUG("named pipe closed: %d", ((uv_pipe_t*)handle)->io_watcher.fd);
+        break;
+    case UV_TCP:
+        L_DEBUG("tcp closed: %d", ((uv_tcp_t*)handle)->io_watcher.fd);
+        break;
+    case UV_STREAM:
+        L_DEBUG("stream closed: %d", ((uv_stream_t*)handle)->io_watcher.fd);
+        break;
+    default:
+        L_DEBUG("handle of type %d is closed", handle->type);
+        break;
+    }
     free(handle);
 }
 
 static void ecr_server_close_walk_cb(uv_handle_t *handle, void *arg) {
     ecr_server_worker_t *worker = arg;
     if (uv_is_closing(handle)) {
+        L_DEBUG("handle %d is closing", handle->u.fd);
         return;
     }
     if (handle == (uv_handle_t*) worker->server->master_socket) {
-        uv_close(handle, ecr_server_close_cb);
+        ecr_uv_close(handle, ecr_server_close_cb);
     } else {
         if (handle->type == UV_TCP) {
             uv_shutdown_t* sreq = malloc(sizeof(uv_shutdown_t));
+            L_DEBUG("shutdown handle %d", ((uv_stream_t*)handle)->io_watcher.fd);
             uv_shutdown(sreq, (uv_stream_t*) handle, worker->server->config.shutdown_cb);
         } else {
-            uv_close(handle, ecr_server_close_cb);
+            ecr_uv_close(handle, ecr_server_close_cb);
         }
     }
 }
@@ -158,7 +192,7 @@ static void ecr_server_pipe_write_cb(uv_write_t* req, int status) {
     if (status) {
         L_ERROR("pipe write error: %s[%d]", uv_strerror(status), status);
     }
-    uv_close((uv_handle_t*) req->data, ecr_server_close_cb);
+    ecr_uv_close((uv_handle_t* ) req->data, ecr_server_close_cb);
     free(req);
 }
 
@@ -174,13 +208,15 @@ static void ecr_server_master_connection_cb(uv_stream_t *stream, int status) {
     uv_tcp_t *client = (uv_tcp_t*) malloc(sizeof(uv_tcp_t));
     uv_tcp_init(stream->loop, client);
     if (uv_accept(stream, (uv_stream_t*) client) == 0) {
+        L_DEBUG("accept connection: %d", client->io_watcher.fd);
         uv_stream_set_blocking((uv_stream_t*) client, 0);
         uv_write_t *write = malloc(sizeof(uv_write_t));
         write->data = client;
+        L_DEBUG("write connection fd %d to pipe %d of worker %d", client->io_watcher.fd, worker_pipe->io_watcher.fd, worker_id);
         uv_write2(write, (uv_stream_t*) worker_pipe, &buf, 1, (uv_stream_t*) client, ecr_server_pipe_write_cb);
         worker_id = (worker_id + 1) % server->config.num_workers;
     } else {
-        uv_close((uv_handle_t*) client, ecr_server_close_cb);
+        ecr_uv_close((uv_handle_t* ) client, ecr_server_close_cb);
     }
 }
 
@@ -192,16 +228,17 @@ static void ecr_server_master_pipe_connection_cb(uv_stream_t *stream, int status
     uv_pipe_t *client = (uv_pipe_t*) malloc(sizeof(uv_pipe_t));
     uv_pipe_init(stream->loop, client, 1);
     if (uv_accept(stream, (uv_stream_t*) client) == 0) {
+        L_DEBUG("Worker %d - accept new pipe: %d", worker->id, client->io_watcher.fd);
         uv_stream_set_blocking((uv_stream_t*) client, 0);
         ecr_list_add(&worker->server->worker_pipes, client);
     } else {
-        uv_close((uv_handle_t*) client, ecr_server_close_cb);
+        ecr_uv_close((uv_handle_t* ) client, ecr_server_close_cb);
     }
 }
 
 static void ecr_server_worker_pipe_read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
     if (nread < 0) {
-        uv_close((uv_handle_t*) stream, ecr_server_close_cb);
+        ecr_uv_close((uv_handle_t* ) stream, ecr_server_close_cb);
         if (buf->base) {
             free(buf->base);
         }
@@ -214,10 +251,11 @@ static void ecr_server_worker_pipe_read_cb(uv_stream_t *stream, ssize_t nread, c
         client->data = worker;
         uv_tcp_init(pipe->loop, client);
         if (uv_accept(stream, (uv_stream_t*) client) == 0) {
+            L_DEBUG("accept tcp %d from pipe %d", client->io_watcher.fd, stream->io_watcher.fd);
             uv_stream_set_blocking((uv_stream_t*) client, 0);
             worker->server->config.accept_cb(worker, client);
         } else {
-            uv_close((uv_handle_t*) client, ecr_server_close_cb);
+            ecr_uv_close((uv_handle_t* ) client, ecr_server_close_cb);
         }
     }
     if (buf->base) {
@@ -248,6 +286,7 @@ static void * ecr_server_worker_routine(void *user) {
     pipe_connect.data = worker;
     uv_pipe_connect(&pipe_connect, worker->pipe, worker->server->config.pipe_file_path,
             ecr_server_worker_pipe_connect_cb);
+    L_DEBUG("pipe connected at %s[%d]", worker->server->config.pipe_file_path, pipe_connect.handle->io_watcher.fd);
 
     uv_run(&worker->loop, UV_RUN_DEFAULT);
     uv_walk(&worker->loop, ecr_server_close_walk_cb, worker);
@@ -265,6 +304,7 @@ int ecr_server_listen(ecr_server_t *server, int backlog) {
     uv_pipe_bind(server->master.pipe, server->config.pipe_file_path);
     uv_listen((uv_stream_t*) server->master.pipe, 128, ecr_server_master_pipe_connection_cb);
     uv_stream_set_blocking((uv_stream_t*) server->master.pipe, 0);
+    L_DEBUG("listen pipe at %s[%d]", server->config.pipe_file_path, server->master.pipe->io_watcher.fd);
 
     server->workers = calloc(server->config.num_workers, sizeof(ecr_server_worker_t));
     for (i = 0; i < server->config.num_workers; i++) {
