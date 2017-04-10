@@ -290,6 +290,7 @@ int ecr_app_startup(ecr_app_t *app, ecr_list_t *modules) {
         stack.idx = 0;
         fprintf(stream, "%s\t%s\t%s\t%s\n", "column", "total", "pps(avg)", "pss(stat_interval)");
         fprintf(stream, "startup_time:\t%s\n", app->startup_time_str);
+        fprintf(stream, "timestamp:\t%lu\n", ecr_current_time());
         ecr_app_loop_next(&stack, stream);
         ecr_counter_snapshot(&app->counter_ctx);
         ecr_counter_print(&app->counter_ctx, stream);
