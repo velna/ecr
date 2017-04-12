@@ -11,9 +11,11 @@
 #include "CUnit/Basic.h"
 
 extern CU_SuiteInfo http_decoder_suites[];
+extern CU_SuiteInfo ipdb_suites[];
 
 static void add_tests() {
     CU_register_suites(http_decoder_suites);
+    CU_register_suites(ipdb_suites);
 }
 
 int main(int argc, char **argv) {

@@ -33,6 +33,7 @@ nobase_include_HEADERS = ecr.h ecrconf.h \
 	ecr/ecr_http_decoder.h \
 	ecr/ecr_httpparser.h \
 	ecr/ecr_io.h \
+	ecr/ecr_ipdb.h \
 	ecr/ecr_kafka.h \
 	ecr/ecr_list.h \
 	ecr/ecr_logger.h \
@@ -76,6 +77,7 @@ libecr_la_SOURCES = \
 	ecr/ecr_io_gzip.c \
 	ecr/ecr_io_lzop.c \
 	ecr/ecr_io_rollingfile.c \
+	ecr/ecr_ipdb.c \
 	ecr/ecr_kafka.c \
 	ecr/ecr_list.c \
 	ecr/ecr_logger.c \
