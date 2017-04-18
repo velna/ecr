@@ -57,13 +57,32 @@ char *ecr_str_trim(char * s) {
     if (i < 0) {
         return cp;
     }
-    while (isspace(*cp)) {
+    while (*cp && isspace(*cp)) {
         cp++;
     }
     while (i >= 0 && isspace(s[i])) {
         s[i--] = '\0';
     }
     return cp;
+}
+
+void ecr_string_trim(ecr_str_t *str, ecr_str_t *out) {
+    char *cp = str->ptr;
+    size_t i = str->len - 1;
+
+    while (*cp && isspace(*cp)) {
+        cp++;
+    }
+    while (i >= 0 && isspace(str->ptr[i])) {
+        i--;
+    }
+    if (out) {
+        out->ptr = cp;
+        out->len = i + 1;
+    } else {
+        str->ptr = cp;
+        str->len = i + 1;
+    }
 }
 
 inline char *ecr_str_tolower(char *s) {
@@ -133,4 +152,94 @@ ecr_str_t* ecr_str_dup(ecr_str_t *to, ecr_str_t *from) {
     memcpy(ret->ptr, from->ptr, from->len);
     ret->len = from->len;
     return ret;
+}
+
+int ecr_str_cast(const char *str, ecr_type_t type, void *out) {
+    int m = 1;
+
+    if (type == ECR_STRING || type == ECR_POINTER) {
+        *((const char**) out) = str;
+        return 0;
+    }
+    size_t len = strlen(str);
+    if (len == 0) {
+        return -1;
+    }
+    char ch = str[len - 1];
+    switch (ch) {
+    case 'k':
+        m = 1000;
+        break;
+    case 'K':
+        m = 1024;
+        break;
+    case 'm':
+        m = 1000 * 1000;
+        break;
+    case 'M':
+        m = 1024 * 1024;
+        break;
+    case 'g':
+        m = 1000 * 1000 * 1000;
+        break;
+    case 'G':
+        m = 1024 * 1024 * 1024;
+        break;
+    case 's':
+    case 'S':
+        m = 1;
+        break;
+    case 'T':
+    case 't':
+        m = 60;
+        break;
+    case 'H':
+    case 'h':
+        m = 60 * 60;
+        break;
+    case 'd':
+        m = 60 * 60 * 24;
+        break;
+    case 'w':
+        m = 60 * 60 * 24 * 7;
+        break;
+    }
+    switch (type) {
+    case ECR_CHAR:
+        *((char*) out) = str[0];
+        break;
+    case ECR_INT8:
+        *((int8_t*) out) = (int8_t) (strtol(str, NULL, 0) * m);
+        break;
+    case ECR_UINT8:
+        *((uint8_t*) out) = (uint8_t) (strtol(str, NULL, 0) * m);
+        break;
+    case ECR_INT16:
+        *((int16_t*) out) = (int16_t) (strtol(str, NULL, 0) * m);
+        break;
+    case ECR_UINT16:
+        *((uint16_t*) out) = (uint16_t) (strtol(str, NULL, 0) * m);
+        break;
+    case ECR_INT32:
+        *((int*) out) = (int) (strtol(str, NULL, 0) * m);
+        break;
+    case ECR_UINT32:
+        *((u_int32_t*) out) = (u_int32_t) (strtoul(str, NULL, 0) * m);
+        break;
+    case ECR_INT64:
+        *((int64_t*) out) = (int64_t) (strtoll(str, NULL, 0) * m);
+        break;
+    case ECR_UINT64:
+        *((u_int64_t*) out) = (u_int64_t) (strtouq(str, NULL, 0) * m);
+        break;
+    case ECR_FLOAT:
+        *((float*) out) = strtof(str, NULL) * m;
+        break;
+    case ECR_DOUBLE:
+        *((double*) out) = strtod(str, NULL) * m;
+        break;
+    default:
+        return -1;
+    }
+    return 0;
 }

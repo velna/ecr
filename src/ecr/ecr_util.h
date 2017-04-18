@@ -183,11 +183,15 @@ char * ecr_str_tok_replace(ecr_str_t *str, const char *delims, char replace_ch, 
 
 char *ecr_str_trim(char *s);
 
+void ecr_string_trim(ecr_str_t *str, ecr_str_t *out);
+
 char *ecr_str_tolower(char *s);
 
 ecr_str_t* ecr_str_dup(ecr_str_t *to, ecr_str_t *from);
 
 size_t ecr_str_rcspn(const char *s, size_t n, const char *stopset);
+
+int ecr_str_cast(const char *str, ecr_type_t type, void *out);
 
 size_t ecr_mem_cspn(const void *mem, size_t n, const char *stopset);
 
