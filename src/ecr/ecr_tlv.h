@@ -14,10 +14,13 @@
 typedef struct {
     char type_size;
     char len_size;
+    char len_inclusive;
     ecr_buf_t *buf;
 } ecr_tlv_t;
 
 int ecr_tlv_init(ecr_tlv_t *tlv, char type_size, char len_size, ecr_buf_t *buf);
+
+int ecr_tlv_init_ex(ecr_tlv_t *tlv, char type_size, char len_size, char len_inclusive, ecr_buf_t *buf);
 
 int ecr_tlv_append(ecr_tlv_t *tlv, size_t type, const void *value, size_t value_len);
 

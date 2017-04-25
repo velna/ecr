@@ -5,9 +5,14 @@
  *      Author: velna
  */
 
+#include "config.h"
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <errno.h>
 #include <stddef.h>
+#include <string.h>
+#include <unistd.h>
+#include <stdlib.h>
 
 static const char * ecr_inet_ntop_v4(const void *src, char *dst, size_t size) {
     const char digits[] = "0123456789";
@@ -103,5 +108,62 @@ const char * ecr_inet_ntop(int af, const void *src, char *dst, size_t size) {
     default:
         errno = EAFNOSUPPORT;
         return NULL;
+    }
+}
+
+int ecr_socket_bind(const char *endpoint) {
+    char *s, *proto, *host, *sport;
+    int port, sock = -1, tcp;
+    struct sockaddr_in dest_addr;
+
+    s = strstr(endpoint, "://");
+    if (!s) {
+        return -1;
+    }
+    proto = strndup(endpoint, s - endpoint);
+    s += 3;
+    sport = strchr(s, ':');
+    if (!sport) {
+        free(proto);
+        return -1;
+    }
+    host = strndup(s, sport - s);
+    sport++;
+    port = atoi(sport);
+    if (port <= 0) {
+        goto end;
+    }
+    tcp = 0;
+    if (strcmp("tcp", proto) == 0) {
+        sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        tcp = 1;
+    } else if (strcmp("udp", proto) == 0) {
+        sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    } else {
+        goto end;
+    }
+    if (sock < 0) {
+        goto end;
+    }
+    memset(&dest_addr, 0, sizeof(struct sockaddr_in));
+    dest_addr.sin_family = AF_INET;
+    dest_addr.sin_port = htons(port);
+    dest_addr.sin_addr.s_addr = host[0] == '*' ? INADDR_ANY : inet_addr(host);
+    if (bind(sock, (struct sockaddr *) &dest_addr, sizeof(struct sockaddr))) {
+        close(sock);
+        sock = -1;
+        goto end;
+    }
+    if (tcp) {
+        if (listen(sock, 128)) {
+            close(sock);
+            sock = -1;
+            goto end;
+        }
+    }
+    end: {
+        free(proto);
+        free(host);
+        return sock;
     }
 }
