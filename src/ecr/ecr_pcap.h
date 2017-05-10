@@ -12,14 +12,7 @@
 #include "ecr_list.h"
 #include "ecr_hashmap.h"
 #include <atomic_ops.h>
-#include <pcap.h>
 #include <pthread.h>
-
-#ifdef ECR_ENABLE_PFRING
-#   define ECR_MAX_NUM_RX_CHANNELS      64
-#   define HAVE_RW_LOCK
-#   include <pfring.h>
-#endif
 
 #define ECR_PCAP_FAMILY_LIBPCAP         0
 #define ECR_PCAP_FAMILY_PFRINGMC        1
@@ -72,7 +65,15 @@ typedef struct {
     ecr_pcap_capable_t *tail;
 } ecr_pcap_capable_chain_t;
 
+typedef struct {
+    int family;
+    int (*init)(ecr_pcap_t *pcap, ecr_pcap_pool_t *pool, const char *device, const ecr_pcap_cfg_t *cfg);
+    int (*stats)(ecr_pcap_t *pcap, ecr_pcap_stat_t *stat);
+    int (*close)(ecr_pcap_t *pcap);
+} ecr_pcap_lib_t;
+
 struct ecr_pcap_pool_s {
+    ecr_list_t pcap_libs;
     ecr_list_t pcaps;
     int num_threads;
     pthread_t *threads;
@@ -80,33 +81,6 @@ struct ecr_pcap_pool_s {
     volatile AO_t tid;
     int running;
 };
-
-typedef struct {
-    ecr_pcap_packet_t *packets;
-    int size;
-    ecr_pcap_t *pcap;
-} ecr_pcap_buf_t;
-
-typedef struct {
-    pthread_mutex_t mutex;
-    pcap_t *pcap;
-    ecr_pcap_buf_t *buf;
-    struct pcap_stat last_stat;
-    char live :1;
-} ecr_pcap_libpcap_t;
-
-#ifdef ECR_ENABLE_PFRING
-typedef struct {
-    ecr_pcap_stat_t stat;
-    pthread_mutex_t mutex;
-    pfring* ring;
-}ecr_pcap_pfringmc_channel_t;
-
-typedef struct {
-    int num_channels;
-    ecr_pcap_pfringmc_channel_t *channels;
-}ecr_pcap_pfringmc_t;
-#endif
 
 struct ecr_pcap_s {
     ecr_pcap_pool_t *pool;
@@ -117,15 +91,14 @@ struct ecr_pcap_s {
     volatile AO_t close_confirm;
     int active :1;
     volatile int closed;
-    union {
-#ifdef ECR_ENABLE_PFRING
-        ecr_pcap_pfringmc_t pfringmc;
-#endif
-        ecr_pcap_libpcap_t libpcap;
-    };
+    ecr_pcap_lib_t *pcaplib;
+    void *pcaplib_ctx;
 };
 
-ecr_pcap_pool_t * ecr_pcap_pool_init(ecr_pcap_pool_cfg_t *cfg);
+extern ecr_pcap_lib_t ecr_pcap_lib_libpcap;
+extern ecr_pcap_lib_t ecr_pcap_lib_libpfring_mc;
+
+ecr_pcap_pool_t * ecr_pcap_pool_init(ecr_pcap_pool_cfg_t *cfg, ecr_pcap_lib_t *pcaplib, ...);
 
 ecr_pcap_t * ecr_pcap_pool_add(ecr_pcap_pool_t *pcap_pool, const char *device, const ecr_pcap_cfg_t *cfg);
 

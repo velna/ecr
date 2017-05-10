@@ -87,6 +87,8 @@ libecr_la_SOURCES = \
 	ecr/ecr_macbind.c \
 	ecr/ecr_mempool.c \
 	ecr/ecr_pcap.c \
+	ecr/ecr_pcap_libpcap.c \
+	ecr/ecr_pcap_libpfring_mc.c \
 	ecr/ecr_pkware.c \
 	ecr/ecr_pub.c \
 	ecr/ecr_radius.c \

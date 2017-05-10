@@ -20,14 +20,6 @@ AM_PROG_CC_C_O
 AC_DEFINE([_GNU_SOURCE], [], [use gnu source])
 AC_DEFINE([MONGO_HAVE_UNISTD], [], [mongo have unistd])
 
-AC_ARG_ENABLE([pfring],
-    [AS_HELP_STRING([--enable-pfring], [default disable])],
-    [pfring=$enableval],
-    [pfring=no])
-if test $pfring != no; then
-	AC_DEFINE([ECR_ENABLE_PFRING], [], [enable pfring])
-fi
-
 # Checks for libraries.
 
 # Checks for header files.
