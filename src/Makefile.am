@@ -47,6 +47,7 @@ nobase_include_HEADERS = ecr.h ecrconf.h \
 	ecr/ecr_rollingfile.h \
 	ecr/ecr_server.h \
 	ecr/ecr_skiplist.h \
+	ecr/ecr_smtp_decoder.h \
 	ecr/ecr_template.h \
 	ecr/ecr_tlv.h \
 	ecr/ecr_uncap.h \
@@ -92,6 +93,7 @@ libecr_la_SOURCES = \
 	ecr/ecr_rollingfile.c \
 	ecr/ecr_server.c \
 	ecr/ecr_skiplist.c \
+	ecr/ecr_smtp_decoder.c \
 	ecr/ecr_template.c \
 	ecr/ecr_tlv.c \
 	ecr/ecr_uncap.c \
