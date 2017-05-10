@@ -24,6 +24,18 @@
 #define P_TIME  1
 #define P_VAR   2
 
+ecr_io_reg_t ecr_io_default_regs[] = { {
+//
+        .name = "gzip",
+        .rename_pattern = "%s.gz",
+        .chain_func = ecr_gzip_open }, {
+//
+        .name = "lzo",
+        .rename_pattern = "%s.lzo",
+        .chain_func = ecr_lzop_open }, {
+//
+        0 } };
+
 typedef struct {
     char hostname[256];
     int id;

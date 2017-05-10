@@ -19,6 +19,8 @@ typedef struct {
     ecr_io_chain_func chain_func;
 } ecr_io_reg_t;
 
+extern ecr_io_reg_t ecr_io_default_regs[];
+
 /**
  * options: mode=(r|w|a)[b][0-9][f|h|R|F][T],bufize=8192
  */
