@@ -171,8 +171,6 @@ typedef struct ecr_http_message_s {
     ecr_http_buf_t _buf[];
 } ecr_http_message_t;
 
-#undef HTTP_MESSAGE_FIELDS
-
 void ecr_http_decoder_init(ecr_http_decoder_t *decoder, ecr_fixedhash_ctx_t *ctx, size_t max_content_chunks);
 
 ecr_http_message_t * ecr_http_new_request(ecr_http_decoder_t *decoder);
