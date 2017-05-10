@@ -76,6 +76,7 @@ libecr_la_SOURCES = \
 	ecr/ecr_heap.c \
 	ecr/ecr_http_decoder.c \
 	ecr/ecr_httpparser.c \
+	ecr/ecr_io.c \
 	ecr/ecr_io_gzip.c \
 	ecr/ecr_io_lzop.c \
 	ecr/ecr_io_rollingfile.c \

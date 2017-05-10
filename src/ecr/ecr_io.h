@@ -32,4 +32,5 @@ FILE * ecr_lzop_open(FILE *file, const char *options);
  * mode=(r|w|a|r+|w+|a+),chown=user:group,chmod=0666,rtime=30T,rsize=100M
  */
 FILE * ecr_rollingfile_open(const char *filestr, int id, ecr_io_reg_t *reg);
+
 #endif /* SRC_ECR_ECR_IO_H_ */
