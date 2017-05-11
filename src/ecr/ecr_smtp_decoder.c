@@ -15,8 +15,8 @@
 #define SMTP_EHLO           "ehlo"
 #define SMTP_AUTH_USER      "auth-user"
 #define SMTP_AUTH_PWD       "auth-pwd"
-#define SMTP_MAIL_FROM      "mail from"
-#define SMTP_RCPT_TO        "rcpt to"
+#define SMTP_MAIL_FROM      "mail-from"
+#define SMTP_RCPT_TO        "rcpt-to"
 #define SMTP_USER_AGENT     "user-agent"
 #define SMTP_DATE           "date"
 #define SMTP_SUBJECT        "subject"
@@ -153,7 +153,7 @@ static int ecr_smtp_token_header(ecr_str_t *key_out, ecr_str_t *value_out, ecr_s
     } while (s + 1 < end && value.ptr[value.len - 1] == ';');
     *key_out = key;
     *value_out = value;
-    if (str2cmp(s - 2, '\r', '\n') == 0 && value.ptr[value.len - 1] != ';') {
+    if (str2cmp(s - 2, '\r', '\n') && value.ptr[value.len - 1] != ';') {
         data->len -= s - data->ptr;
         data->ptr = s;
         return 0;
@@ -179,6 +179,7 @@ void ecr_smtp_decoder_init(ecr_smtp_decoder_t *decoder, ecr_fixedhash_ctx_t *ctx
     decoder->keys.Mime_Version = ecr_fixedhash_getkey(ctx, SMTP_MIME_VERSION, strlen(SMTP_MIME_VERSION));
     decoder->keys.Content_Type = ecr_fixedhash_getkey(ctx, SMTP_CONTENT_TYPE, strlen(SMTP_CONTENT_TYPE));
     decoder->max_content_chunks = max_content_chunks;
+    decoder->hash_ctx = ctx;
 }
 
 ecr_smtp_message_t * ecr_smtp_new_request(ecr_smtp_decoder_t *decoder) {
@@ -194,6 +195,7 @@ ecr_smtp_message_t * ecr_smtp_new_request(ecr_smtp_decoder_t *decoder) {
     message->decoder = decoder;
     message->decode_status = SMTP_DECODE_INIT;
     message->_status = DECODE_INIT;
+    message->type = SMTP_REQUEST;
     return message;
 }
 
@@ -229,6 +231,38 @@ ecr_smtp_message_type_t ecr_smtp_guess(char *data, size_t size) {
     return type;
 }
 
+void ecr_smtp_message_dump(ecr_smtp_message_t *message, FILE *stream) {
+    ecr_smtp_chunk_t *chunk;
+    ecr_fixedhash_iter_t iter;
+    ecr_str_t key, *value;
+
+    fprintf(stream, "{===\n");
+    fprintf(stream, "[decode_status: %hhd, "
+            "error_no: %hhd, "
+            "_status: %hhd]\n", message->decode_status, message->error_no, message->_status);
+
+    ecr_fixedhash_iter_init(&iter, message->headers);
+    while ((value = ecr_fixedhash_iter_next(&iter, NULL, &key))) {
+        fprintf(stream, "%s: [", key.ptr);
+        fwrite(value->ptr, value->len, 1, stream);
+        fprintf(stream, "]\n");
+    }
+
+    chunk = message->_chunks->head;
+    while (chunk) {
+        ecr_binary_dump(stream, chunk->data.ptr, chunk->data.len);
+        chunk = chunk->next;
+    }
+    if (message->content) {
+        chunk = message->content->head;
+        while (chunk) {
+            ecr_binary_dump(stream, chunk->data.ptr, chunk->data.len);
+            chunk = chunk->next;
+        }
+    }
+    fprintf(stream, "===}\n");
+}
+
 static int ecr_smtp_make_content(ecr_smtp_message_t *message, ecr_str_t *data) {
     ecr_smtp_buf_t *buf;
     size_t data_len;
@@ -241,11 +275,12 @@ static int ecr_smtp_make_content(ecr_smtp_message_t *message, ecr_str_t *data) {
     rc = 1;
     data_len = data->len;
     while (i + 5 <= data->len) {
-        if (str5cmp(data->ptr + i, '\r', '\n', '.', '\r', '\n') == 0) {
+        if (str5cmp(data->ptr + i, '\r', '\n', '.', '\r', '\n')) {
             rc = 0;
             data_len = i;
             break;
         }
+        i++;
     }
     buf = message->_buf + message->_buf_idx;
     buf->data.ptr = data->ptr;
@@ -330,9 +365,9 @@ int ecr_smtp_decode(ecr_smtp_message_t *message, char *ptr, size_t size) {
                 message->decode_status = SMTP_DECODE_MORE;
                 break;
             }
+            cmd_prefix = *((int*) data.ptr);
             data.ptr += 4;
             data.len -= 4;
-            cmd_prefix = *((int*) data.ptr);
             switch (cmd_prefix) {
             case CMD_PREFIX_HELO:
             case CMD_PREFIX_EHLO:
@@ -347,7 +382,9 @@ int ecr_smtp_decode(ecr_smtp_message_t *message, char *ptr, size_t size) {
                 message->_next_status = DECODE_AUTH_USER;
                 break;
             case CMD_PREFIX_MAIL:
-                if (data.len >= 10 && str6cmp(data.ptr, ' ', 'F', 'R', 'O', 'M', ':') == 0) {
+                if (data.len >= 10 && str6cmp(data.ptr, ' ', 'F', 'R', 'O', 'M', ':')) {
+                    data.ptr += 6;
+                    data.len -= 6;
                     if (ecr_smtp_token_line(&message->request.mail_from, &data)) {
                         message->decode_status = SMTP_DECODE_MORE;
                     } else {
@@ -358,7 +395,9 @@ int ecr_smtp_decode(ecr_smtp_message_t *message, char *ptr, size_t size) {
                 }
                 break;
             case CMD_PREFIX_RCPT:
-                if (data.len >= 4 && str4cmp(data.ptr, ' ', 'T', 'O', ':') == 0) {
+                if (data.len >= 4 && str4cmp(data.ptr, ' ', 'T', 'O', ':')) {
+                    data.ptr += 4;
+                    data.len -= 4;
                     if (ecr_smtp_token_line(&message->request.rcpt_to, &data)) {
                         message->decode_status = SMTP_DECODE_MORE;
                     } else {
@@ -434,7 +473,7 @@ int ecr_smtp_decode(ecr_smtp_message_t *message, char *ptr, size_t size) {
             break;
         case DECODE_SKIP_LINE:
             while (data.len >= 2) {
-                if (str2cmp(data.ptr, '\r', '\n') == 0) {
+                if (str2cmp(data.ptr, '\r', '\n')) {
                     data.ptr += 2;
                     data.len -= 2;
                     message->_status = message->_next_status;

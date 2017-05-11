@@ -10,6 +10,7 @@
 
 #include "ecrconf.h"
 #include "ecr_fixedhashmap.h"
+#include <stdio.h>
 
 // decode status
 #define SMTP_DECODE_INIT            -2
@@ -115,6 +116,8 @@ void ecr_smtp_decoder_init(ecr_smtp_decoder_t *decoder, ecr_fixedhash_ctx_t *ctx
 ecr_smtp_message_t * ecr_smtp_new_request(ecr_smtp_decoder_t *decoder);
 
 ecr_smtp_message_type_t ecr_smtp_guess(char *data, size_t size);
+
+void ecr_smtp_message_dump(ecr_smtp_message_t *message, FILE *stream);
 
 /**
  * return SMTP_DECODE_OK for complete, SMTP_DECODE_MORE for incomplete, SMTP_DECODE_ERR for error
