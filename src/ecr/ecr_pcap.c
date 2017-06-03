@@ -232,6 +232,7 @@ void ecr_pcap_pool_destroy(ecr_pcap_pool_t *pool) {
     free(pool->threads);
     free(pool->capable_chains);
     ecr_list_destroy(&pool->pcaps, NULL);
+    ecr_list_destroy(&pool->pcap_libs, NULL);
     free(pool);
     L_INFO("pcap pool destroied ...");
 }
