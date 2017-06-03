@@ -79,7 +79,7 @@ struct ecr_pcap_pool_s {
     pthread_t *threads;
     ecr_pcap_capable_chain_t *capable_chains;
     volatile AO_t tid;
-    int running;
+    volatile int running;
 };
 
 struct ecr_pcap_s {

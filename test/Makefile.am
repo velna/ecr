@@ -1,4 +1,4 @@
-bin_PROGRAMS=ecr_test run_test
+bin_PROGRAMS=ecr_test run_test stoi
 
 ecr_test_SOURCES=ecr_test.c
 
@@ -37,3 +37,6 @@ run_test_LDADD		= \
 
 run_test_LDFLAGS	= \
 	-lpthread -latomic_ops -lrt -lcrypto -lstdc++ -lssl -lcurses -lsasl2
+
+	
+stoi_SOURCES=stoi.c

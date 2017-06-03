@@ -12,6 +12,14 @@
 
 static const char * BASE64_TABLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
 
+static void ecr_base64_init_decode_table(const char *table, char *decode_table) {
+    int i;
+    memset(decode_table, -1, 127);
+    for (i = 0; i < 64; i++) {
+        decode_table[(int)table[i]] = i;
+    }
+}
+
 size_t ecr_base64_encode_s(char *to, const void *str, size_t len) {
     char *res;
     const unsigned char *cptr = str;
@@ -51,38 +59,38 @@ size_t ecr_base64_encode_s(char *to, const void *str, size_t len) {
 
 int ecr_base64_decode(const unsigned char *in, size_t inlen, unsigned char *out, size_t *outlen) {
     int i, j;
-    unsigned char k;
     unsigned char temp[4];
+    char decode_table[128];
+    ecr_base64_init_decode_table(BASE64_TABLE, decode_table);
     for (i = 0, j = 0; i < inlen; i += 4) {
-        memset(temp, 0xFF, sizeof(temp));
-        for (k = 0; k < 64; k++) {
-            if (BASE64_TABLE[k] == in[i])
-                temp[0] = k;
-        }
-        for (k = 0; k < 64; k++) {
-            if (BASE64_TABLE[k] == in[i + 1])
-                temp[1] = k;
-        }
-        for (k = 0; k < 64; k++) {
-            if (BASE64_TABLE[k] == in[i + 2])
-                temp[2] = k;
-        }
-        for (k = 0; k < 64; k++) {
-            if (BASE64_TABLE[k] == in[i + 3])
-                temp[3] = k;
+        if ((in[i] > 127 || (temp[0] = decode_table[in[i]])) < 0
+                || (in[i + 1] > 127 || (temp[1] = decode_table[in[i + 1]]) < 0)
+                || (in[i + 2] > 127 || (temp[2] = decode_table[in[i + 2]]) < 0)
+                || (in[i + 3] > 127 || (temp[3] = decode_table[in[i + 3]]) < 0)) {
+            return -1;
         }
 
+        if (j >= *outlen) {
+            break;
+        }
         out[j++] = ((unsigned char) (((unsigned char) (temp[0] << 2)) & 0xFC))
                 | ((unsigned char) ((unsigned char) (temp[1] >> 4) & 0x03));
         if (in[i + 2] == '=')
             break;
 
+        if (j >= *outlen) {
+            break;
+        }
         out[j++] = ((unsigned char) (((unsigned char) (temp[1] << 4)) & 0xF0))
                 | ((unsigned char) ((unsigned char) (temp[2] >> 2) & 0x0F));
         if (in[i + 3] == '=')
             break;
 
+        if (j >= *outlen) {
+            break;
+        }
         out[j++] = ((unsigned char) (((unsigned char) (temp[2] << 6)) & 0xF0)) | ((unsigned char) (temp[3] & 0x3F));
     }
+    *outlen = j;
     return j;
 }

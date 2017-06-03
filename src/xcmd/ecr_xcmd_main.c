@@ -5,8 +5,8 @@
  *      Author: velna
  */
 
-#include "ecr_util.h"
-#include "ecr_logger.h"
+#include <ecr/ecr_util.h>
+#include <ecr/ecr_logger.h>
 #include <stdlib.h>
 #include <string.h>
 #include <zmq.h>

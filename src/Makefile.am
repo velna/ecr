@@ -1,14 +1,3 @@
-bin_PROGRAMS = xcmd
-
-xcmd_SOURCES = ecr/ecr_xcmd_main.c
-
-xcmd_CFLAGS	=-Wall $(shell pkg-config --cflags libmongoc-1.0)
-xcmd_LDADD		= \
-	/usr/local/lib/libecr.a \
-	/usr/local/lib/libzmq.a
-
-xcmd_LDFLAGS	=-lpthread -latomic_ops -lrt -lcrypto -lstdc++
-
 #######################################
 # The list of libraries we are building seperated by spaces.
 # The 'lib_' indicates that these build products will be installed
@@ -53,11 +42,12 @@ nobase_include_HEADERS = ecr.h ecrconf.h \
 	ecr/ecr_uncap.h \
 	ecr/ecr_urlmatch.h \
 	ecr/ecr_util.h \
+	ecr/ecr_worker_pool.h \
 	ecr/ecr_wumanber.h
 
 # Sources for ecr
 libecr_la_SOURCES = \
-	ecr_version.c \
+	ecr/ecr_version.c \
 	ecr/ecr_app.c \
 	ecr/ecr_bloomfilter.c \
 	ecr/ecr_buf.c \
@@ -88,7 +78,6 @@ libecr_la_SOURCES = \
 	ecr/ecr_mempool.c \
 	ecr/ecr_pcap.c \
 	ecr/ecr_pcap_libpcap.c \
-	ecr/ecr_pcap_libpfring_mc.c \
 	ecr/ecr_pkware.c \
 	ecr/ecr_pub.c \
 	ecr/ecr_radius.c \
@@ -107,7 +96,12 @@ libecr_la_SOURCES = \
 	ecr/ecr_util_inet.c \
 	ecr/ecr_util_string.c \
 	ecr/ecr_util_zmq.c \
+	ecr/ecr_worker_pool.c \
 	ecr/ecr_wumanber.c
+
+if ENABLE_PFRING
+libecr_la_SOURCES+=ecr/ecr_pcap_libpfring_mc.c
+endif
 
 
 # Linker options libTestProgram

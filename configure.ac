@@ -22,6 +22,16 @@ AC_DEFINE([MONGO_HAVE_UNISTD], [], [mongo have unistd])
 
 # Checks for libraries.
 
+AC_ARG_ENABLE([pfring],
+    [AS_HELP_STRING([--enable-pfring], [enable pfring, default disable])],
+    [pfring=$enableval],
+    [pfring=no])
+AM_CONDITIONAL([ENABLE_PFRING], [test x$pfring != xno])
+if test $pfring != no; then
+        AC_DEFINE([ENABLE_PFRING], [], [enable pfring])
+fi
+
+
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h stdint.h stdlib.h string.h sys/socket.h unistd.h netinet/in.h sys/time.h])
 
@@ -40,6 +50,7 @@ AC_CHECK_FUNCS([gettimeofday memmove memset strchr strdup strerror])
 
 AC_CONFIG_FILES([Makefile
                  src/Makefile
+                 src/xcmd/Makefile
                  test/Makefile])
 AC_OUTPUT
 
