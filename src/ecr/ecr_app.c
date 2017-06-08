@@ -18,6 +18,8 @@
 #include <time.h>
 #include <zmq.h>
 
+#define MODULE_NAME     "app"
+
 static ecr_option_t ecr_sys_cmd_options[] = {
 //
         { "heartbeat", 0, NULL, 'b' }, //
@@ -67,32 +69,11 @@ static void ecr_app_mongo_log_handler(mongoc_log_level_t log_level, const char *
 
 int ecr_app_init(ecr_app_t *app, int argc, char **argv) {
     int opt;
-    struct tm stm;
-    pthread_attr_t attr;
-    pthread_t thread;
-    char thread_name[255];
-
-    ecr_config_line_t app_config_lines[] = {
-    //
-            { "home", &app->config.home, ECR_CFG_STRING }, //
-            { "umask", &app->config.umask, ECR_CFG_INT, .dv.i = 022 }, //
-            { "main_loop_interval", &app->config.main_loop_interval, ECR_CFG_INT, .dv.i = 2 }, //
-            { "fork_process", &app->config.fork_process, ECR_CFG_INT, .dv.i = 0 }, //
-            { "log_file", &app->config.log_file, ECR_CFG_STRING }, //
-            { "stat_log_file", &app->config.stat_log_file, ECR_CFG_STRING }, //
-            { "cmd_zmq_bind", &app->config.cmd_zmq_bind, ECR_CFG_STRING }, //
-            { "pid_file", &app->config.pid_file, ECR_CFG_STRING }, //
-            { "zmq_io_thread_count", &app->config.zmq_io_thread_count, ECR_CFG_INT, .dv.i = 1 }, //
-            { "mongo_uri", &app->config.mongo_uri, ECR_CFG_STRING }, //
-            { "kafka_brokers", &app->config.kafka_brokers, ECR_CFG_STRING }, //
-            { 0 } };
 
     assert(app && argc >= 0 && argv);
     memset(app, 0, sizeof(ecr_app_t));
     app->argc = argc;
     app->argv = argv;
-
-    ecr_get_thread_name(thread_name);
 
     ecr_getopt_data_t getopt_data = ECR_GETOPT_DATA_INITIALIZER;
     while ((opt = ecr_getopt(argc, argv, "c:", &getopt_data)) != -1) {
@@ -110,7 +91,97 @@ int ecr_app_init(ecr_app_t *app, int argc, char **argv) {
         ecr_config_destroy(&app->config_props);
         return -1;
     }
-    ecr_config_load(&app->config_props, "app", app_config_lines);
+
+    if (ecr_config_get(&app->config_props, MODULE_NAME, "fork_process", ECR_CFG_INT, &app->config.fork_process)) {
+        app->config.fork_process = 0;
+    }
+    if (app->config.fork_process) {
+        app->pid = fork();
+        if (app->pid < 0) {
+            L_ERROR("error fork process!");
+            return -1;
+        } else if (app->pid > 0) {
+            L_INFO("forked process: %d", app->pid);
+            ecr_config_destroy(&app->config_props);
+            return 1;
+        } else {
+            app->pid = getpid();
+        }
+    } else {
+        app->pid = getpid();
+    }
+
+    return 0;
+}
+
+int ecr_app_init_next(ecr_app_module_stack_t *stack) {
+    do {
+        if (stack->idx < ecr_list_size(stack->modules)) {
+            stack->module = ecr_list_get(stack->modules, stack->idx++);
+            L_INFO("init app module %s ...", stack->module->name);
+        } else {
+            return 0;
+        }
+    } while (!stack->module->init_handler);
+
+    return stack->module->init_handler(stack);
+}
+
+int ecr_app_loop_next(ecr_app_module_stack_t *stack, FILE *stream) {
+    do {
+        if (stack->idx < ecr_list_size(stack->modules)) {
+            stack->module = ecr_list_get(stack->modules, stack->idx++);
+        } else {
+            return 0;
+        }
+    } while (!stack->module->loop_handler);
+
+    return stack->module->loop_handler(stack, stream);
+}
+
+int ecr_app_destroy_next(ecr_app_module_stack_t *stack) {
+    do {
+        if (stack->idx >= 0) {
+            stack->module = ecr_list_get(stack->modules, stack->idx--);
+            L_INFO("destroy app module %s ...", stack->module->name);
+        } else {
+            return 0;
+        }
+    } while (!stack->module->destroy_handler);
+
+    return stack->module->destroy_handler(stack);
+}
+
+int ecr_app_startup(ecr_app_t *app, ecr_list_t *modules) {
+    char * stat_string;
+    size_t size;
+    FILE* stream;
+    ecr_app_module_stack_t stack;
+    int rc = 0;
+    struct tm stm;
+    pthread_attr_t attr;
+    pthread_t thread;
+    char thread_name[255];
+    ecr_config_line_t app_config_lines[] = {
+    //
+            { "home", &app->config.home, ECR_CFG_STRING }, //
+            { "umask", &app->config.umask, ECR_CFG_INT, .dv.i = 022 }, //
+            { "main_loop_interval", &app->config.main_loop_interval, ECR_CFG_INT, .dv.i = 2 }, //
+            { "log_file", &app->config.log_file, ECR_CFG_STRING }, //
+            { "stat_log_file", &app->config.stat_log_file, ECR_CFG_STRING }, //
+            { "cmd_zmq_bind", &app->config.cmd_zmq_bind, ECR_CFG_STRING }, //
+            { "pid_file", &app->config.pid_file, ECR_CFG_STRING }, //
+            { "zmq_io_thread_count", &app->config.zmq_io_thread_count, ECR_CFG_INT, .dv.i = 1 }, //
+            { "mongo_uri", &app->config.mongo_uri, ECR_CFG_STRING }, //
+            { "kafka_brokers", &app->config.kafka_brokers, ECR_CFG_STRING }, //
+            { 0 } };
+
+    assert(app);
+    L_INFO("system startup...");
+
+    ecr_get_thread_name(thread_name);
+
+    ecr_config_load(&app->config_props, MODULE_NAME, app_config_lines);
 
     if (!app->config.home) {
         L_ERROR("home not configured.");
@@ -122,23 +193,7 @@ int ecr_app_init(ecr_app_t *app, int argc, char **argv) {
     }
     umask(app->config.umask);
 
-    if (app->config.fork_process) {
-        app->pid = fork();
-        if (app->pid < 0) {
-            L_ERROR("error fork process!");
-            return -1;
-        } else if (app->pid > 0) {
-            L_INFO("forked process: %d", app->pid);
-            ecr_echo_pid(app->pid, app->config.pid_file);
-            ecr_config_destroy(&app->config_props);
-            return 1;
-        } else {
-            app->pid = getpid();
-        }
-    } else {
-        app->pid = getpid();
-        ecr_echo_pid(app->pid, app->config.pid_file);
-    }
+    ecr_echo_pid(app->pid, app->config.pid_file);
 
     sigemptyset(&app->sigset);
     sigaddset(&app->sigset, SIGINT);
@@ -158,8 +213,6 @@ int ecr_app_init(ecr_app_t *app, int argc, char **argv) {
     } else {
         app->stat_log_file = ECR_LOG_FILE;
     }
-
-    L_INFO("system init...");
 
     time(&app->startup_time);
     localtime_r(&app->startup_time, &stm);
@@ -217,57 +270,6 @@ int ecr_app_init(ecr_app_t *app, int argc, char **argv) {
         }
         L_INFO("kafka brokers connected at %s", app->config.kafka_brokers);
     }
-
-    return 0;
-}
-
-int ecr_app_init_next(ecr_app_module_stack_t *stack) {
-    do {
-        if (stack->idx < ecr_list_size(stack->modules)) {
-            stack->module = ecr_list_get(stack->modules, stack->idx++);
-            L_INFO("init app module %s ...", stack->module->name);
-        } else {
-            return 0;
-        }
-    } while (!stack->module->init_handler);
-
-    return stack->module->init_handler(stack);
-}
-
-int ecr_app_loop_next(ecr_app_module_stack_t *stack, FILE *stream) {
-    do {
-        if (stack->idx < ecr_list_size(stack->modules)) {
-            stack->module = ecr_list_get(stack->modules, stack->idx++);
-        } else {
-            return 0;
-        }
-    } while (!stack->module->loop_handler);
-
-    return stack->module->loop_handler(stack, stream);
-}
-
-int ecr_app_destroy_next(ecr_app_module_stack_t *stack) {
-    do {
-        if (stack->idx >= 0) {
-            stack->module = ecr_list_get(stack->modules, stack->idx--);
-            L_INFO("destroy app module %s ...", stack->module->name);
-        } else {
-            return 0;
-        }
-    } while (!stack->module->destroy_handler);
-
-    return stack->module->destroy_handler(stack);
-}
-
-int ecr_app_startup(ecr_app_t *app, ecr_list_t *modules) {
-    char * stat_string;
-    size_t size;
-    FILE* stream;
-    ecr_app_module_stack_t stack;
-    int rc = 0;
-
-    assert(app);
-    L_INFO("system startup...");
 
     stack.app = app;
     stack.modules = modules;
