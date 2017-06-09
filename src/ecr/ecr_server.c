@@ -344,6 +344,7 @@ static void ecr_server_worker_destroy(ecr_server_worker_t *worker) {
         linked_list_pop(&worker->cmd_ctx.cmd_chain, cmd);
     }
     uv_loop_close(&worker->loop);
+    free_to_null(worker->cmd_ctx.async);
 }
 
 void ecr_server_destroy(ecr_server_t *server) {
