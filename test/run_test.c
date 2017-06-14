@@ -13,12 +13,14 @@
 
 extern CU_SuiteInfo http_decoder_suites[];
 extern CU_SuiteInfo ipdb_suites[];
-extern CU_SuiteInfo template_suites[];
+//extern CU_SuiteInfo template_suites[];
+extern CU_SuiteInfo crypto_suites[];
 
 static void add_tests() {
     CU_register_suites(http_decoder_suites);
     CU_register_suites(ipdb_suites);
-    CU_register_suites(template_suites);
+//    CU_register_suites(template_suites);
+    CU_register_suites(crypto_suites);
 }
 
 int main(int argc, char **argv) {

@@ -42,6 +42,7 @@ nobase_include_HEADERS = ecr.h ecrconf.h \
 	ecr/ecr_uncap.h \
 	ecr/ecr_urlmatch.h \
 	ecr/ecr_util.h \
+	ecr/ecr_util_crypto.h \
 	ecr/ecr_worker_pool.h \
 	ecr/ecr_wumanber.h
 
@@ -92,6 +93,7 @@ libecr_la_SOURCES = \
 	ecr/ecr_urlmatch.c \
 	ecr/ecr_util.c \
 	ecr/ecr_util_base64.c \
+	ecr/ecr_util_crypto.c \
 	ecr/ecr_util_hash.c \
 	ecr/ecr_util_inet.c \
 	ecr/ecr_util_string.c \

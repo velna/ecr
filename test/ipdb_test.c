@@ -39,6 +39,8 @@ static void ipdb_test_query() {
     ipdb_test_query0("139.122.233.2", 0, 81);
     ipdb_test_query0("140.1.2.3", -1, 0);
     ipdb_test_query0("1.1.1.1", -1, 0);
+    ipdb_test_query0("42.184.3.34", 0, 23);
+    ipdb_test_query0("61.240.232.3", 0, 43);
 }
 
 CU_TestInfo ipdb_cases[] = {
@@ -48,5 +50,5 @@ CU_TestInfo ipdb_cases[] = {
 
 CU_SuiteInfo ipdb_suites[] = {
 //
-        { "http request decoder suites:", init, cleanup, NULL, NULL, ipdb_cases },
+        { "ipdb suites:", init, cleanup, NULL, NULL, ipdb_cases },
         CU_SUITE_INFO_NULL };

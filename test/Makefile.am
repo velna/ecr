@@ -19,6 +19,7 @@ ecr_test_LDFLAGS	=-lpthread -latomic_ops -lrt -lcrypto -lstdc++ -lssl -lsasl2
 
 run_test_SOURCES	= \
 	run_test.c \
+	util_crypto_test.c \
 	http_decoder_test.c \
 	ipdb_test.c \
 	template_test.c

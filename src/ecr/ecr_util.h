@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <netinet/in.h>
+#include "ecr_util_crypto.h"
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 
