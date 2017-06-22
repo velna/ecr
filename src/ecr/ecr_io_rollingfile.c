@@ -247,7 +247,7 @@ static int ecr_rf_maybe_open(ecr_rollingfile_t *rf, struct tm *stm, int batch) {
     if (rf->mkdirs) {
         path = strdup(filename);
         dir = dirname(path);
-        if (dir && ecr_mkdirs(dir, rf->mkdirs)) {
+        if (dir && ecr_mkdirs(dir, rf->mkdirs, rf->uid, rf->gid)) {
             free(path);
             L_ERROR("error mkdir %s: %s", dir, strerror(errno));
             return -1;

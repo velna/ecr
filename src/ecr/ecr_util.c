@@ -17,6 +17,7 @@
 #include <sys/stat.h>
 #include <libgen.h>
 #include <errno.h>
+#include <unistd.h>
 
 static char ecr_HEXS[] = "0123456789abcdef";
 
@@ -316,7 +317,7 @@ uint32_t ecr_random_next() {
     return ecr_radom_seed_;
 }
 
-int ecr_mkdirs(const char *path, mode_t mode) {
+int ecr_mkdirs(const char *path, mode_t mode, int owner, int group) {
     char *dir, *s;
     int rc;
     struct stat st;
@@ -337,8 +338,11 @@ int ecr_mkdirs(const char *path, mode_t mode) {
             s = strdup(path);
             dir = dirname(s);
             if (dir) {
-                if (ecr_mkdirs(dir, mode) == 0) {
+                if (ecr_mkdirs(dir, mode, owner, group) == 0) {
                     rc = mkdir(path, mode);
+                    if (rc == 0 && owner >= 0 && group >= 0) {
+                        rc = chown(path, owner, group);
+                    }
 //                    printf("mkdir %s: %s[%d]\n", path, strerror(errno), errno);
                 }
             }
