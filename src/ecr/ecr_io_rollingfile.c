@@ -24,6 +24,8 @@
 #define P_TIME  1
 #define P_VAR   2
 
+#define RF_ERR_BUF_SIZE  512
+
 typedef struct {
     char hostname[256];
     int id;
@@ -59,13 +61,16 @@ typedef struct {
     int closed :1;
     pthread_mutex_t lock;
     ecr_config_t *config;
+    char errbuf[RF_ERR_BUF_SIZE];
 } ecr_rollingfile_t;
 
 static pthread_once_t ecr_rf_cheker_oc = PTHREAD_ONCE_INIT;
 static ecr_list_t ecr_rf_list;
 
-static char * ecr_fmt_pattern(const char *pattern, const struct tm *t, ecr_vars_t *vars, const char *tmp) {
-    const char *s = pattern;
+#define RF_ERROR(rf, fmt, ...) snprintf(rf->errbuf, RF_ERR_BUF_SIZE, fmt, ##__VA_ARGS__)
+
+static char * ecr_fmt_pattern(ecr_rollingfile_t *rf, const struct tm *t, ecr_vars_t *vars, const char *tmp) {
+    const char *s = rf->pattern;
     int f;
     char *ret, ch;
     size_t size = 0;
@@ -103,7 +108,7 @@ static char * ecr_fmt_pattern(const char *pattern, const struct tm *t, ecr_vars_
                 fprintf(stream, "%03d", t->tm_yday);
                 break;
             default:
-                L_ERROR("invalid conversion: %%%c", ch);
+                RF_ERROR(rf, "invalid conversion: %%%c", ch);
                 fclose(stream);
                 free(ret);
                 return NULL;
@@ -131,7 +136,7 @@ static char * ecr_fmt_pattern(const char *pattern, const struct tm *t, ecr_vars_
                 fprintf(stream, "%d", vars->batch);
                 break;
             default:
-                L_ERROR("invalid variable: $%c", ch);
+                RF_ERROR(rf, "invalid variable: $%c", ch);
                 fclose(stream);
                 free(ret);
                 return NULL;
@@ -160,7 +165,7 @@ static char * ecr_fmt_pattern(const char *pattern, const struct tm *t, ecr_vars_
     fclose(stream);
     if (f != P_NONE) {
         free(ret);
-        L_ERROR("incomplete conversion: %%");
+        RF_ERROR(rf, "incomplete conversion: %%");
         return NULL;
     }
     return ret;
@@ -188,7 +193,7 @@ static int ecr_rf_close0(ecr_rollingfile_t *rf) {
         if (wrapper->rename_pattern) {
             asprintf(&renamefile, wrapper->rename_pattern, rfn);
             if (rename(fn, renamefile)) {
-                L_ERROR("error rename file %s to %s", fn, renamefile);
+                RF_ERROR(rf, "error rename file %s to %s", fn, renamefile);
                 free(renamefile);
                 break;
             }
@@ -221,7 +226,7 @@ static int ecr_rf_maybe_open(ecr_rollingfile_t *rf, struct tm *stm, int batch) {
         stm = &stm0;
     }
 
-    filename = ecr_fmt_pattern(rf->pattern, stm, &rf->vars, rf->tmp);
+    filename = ecr_fmt_pattern(rf, stm, &rf->vars, rf->tmp);
     if (!filename) {
         return -1;
     }
@@ -229,7 +234,7 @@ static int ecr_rf_maybe_open(ecr_rollingfile_t *rf, struct tm *stm, int batch) {
         free(filename);
         if (batch) {
             rf->vars.batch++;
-            filename = ecr_fmt_pattern(rf->pattern, stm, &rf->vars, rf->tmp);
+            filename = ecr_fmt_pattern(rf, stm, &rf->vars, rf->tmp);
             if (!filename) {
                 return -1;
             }
@@ -249,7 +254,7 @@ static int ecr_rf_maybe_open(ecr_rollingfile_t *rf, struct tm *stm, int batch) {
         dir = dirname(path);
         if (dir && ecr_mkdirs(dir, rf->mkdirs, rf->uid, rf->gid)) {
             free(path);
-            L_ERROR("error mkdir %s: %s", dir, strerror(errno));
+            RF_ERROR(rf, "error mkdir %s: %s", dir, strerror(errno));
             return -1;
         }
         free(path);
@@ -257,19 +262,19 @@ static int ecr_rf_maybe_open(ecr_rollingfile_t *rf, struct tm *stm, int batch) {
 
     file = fopen(filename, rf->mode);
     if (!file) {
-        L_ERROR("error open file %s: %s", filename, strerror(errno));
+        RF_ERROR(rf, "error open file %s: %s", filename, strerror(errno));
         free(filename);
         return -1;
     }
     fd = fileno(file);
     if (rf->uid >= 0 && rf->gid >= 0) {
         if (fchown(fd, rf->uid, rf->gid)) {
-            L_WARN("error chown of file %s: %s", filename, strerror(errno));
+            RF_ERROR(rf, "error chown of file %s: %s", filename, strerror(errno));
         }
     }
     if (rf->chmod) {
         if (fchmod(fd, rf->chmod)) {
-            L_WARN("error chmod of file %s: %s", filename, strerror(errno));
+            RF_ERROR(rf, "error chmod of file %s: %s", filename, strerror(errno));
         }
     }
     for (i = 0; i < ecr_list_size(rf->wrappers); i++) {
@@ -312,6 +317,10 @@ static void * ecr_rf_check_routin(void *user) {
                 free(rf);
                 continue;
             }
+            if (rf->errbuf[0]) {
+                L_ERROR("%s", rf->errbuf);
+                rf->errbuf[0] = '\0';
+            }
             now = ecr_current_time();
             t = time(NULL);
             localtime_r(&t, &stm);
@@ -352,7 +361,8 @@ static void ecr_rf_checker_init() {
 }
 
 static ssize_t ecr_rf_read(void *cookie, char *buf, size_t len) {
-    L_ERROR("read on rolling file is not supported.");
+    ecr_rollingfile_t *rf = cookie;
+    RF_ERROR(rf, "read on rolling file is not supported.");
     return -1;
 }
 
@@ -378,7 +388,8 @@ static ssize_t ecr_rf_write(void *cookie, const char *buf, size_t len) {
 }
 
 static int ecr_rf_seek(void *cookie, off64_t *off, int whence) {
-    L_ERROR("seek on rolling file is not supported.");
+    ecr_rollingfile_t *rf = cookie;
+    RF_ERROR(rf, "seek on rolling file is not supported.");
     errno = EBADF;
     return -1;
 }
@@ -444,6 +455,8 @@ FILE * ecr_rollingfile_open(const char *filestr, int id, ecr_io_reg_t *regs) {
             { "mkdir", &rf->mkdirs, ECR_CFG_INT }, //
             { "tmp", &rf->tmp, ECR_CFG_STRING }, //
             { 0 } };
+
+    pthread_once(&ecr_rf_cheker_oc, ecr_rf_checker_init);
 
     s = strdup(filestr);
     chain = strtok_r(s, "|", &ss);
@@ -563,12 +576,12 @@ FILE * ecr_rollingfile_open(const char *filestr, int id, ecr_io_reg_t *regs) {
         rf->tmplen = strlen(rf->tmp);
     }
     if (ecr_rf_maybe_open(rf, NULL, 0)) {
+        L_ERROR("%s", rf->errbuf);
         ecr_rf_close(rf);
         free(rf);
         return NULL;
     }
 
-    pthread_once(&ecr_rf_cheker_oc, ecr_rf_checker_init);
     ecr_list_add(&ecr_rf_list, rf);
     pthread_mutex_init(&rf->lock, NULL);
 
