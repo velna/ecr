@@ -61,10 +61,14 @@ void * ecr_tlv_get(ecr_tlv_t *tlv, size_t *type, size_t *value_len) {
     if (v) {
         size = 0;
         memcpy(&size, v, tlv->len_size);
-        if (size <= tlv->type_size + tlv->len_size) {
-            return NULL;
+        if (tlv->len_inclusive) {
+            if (size <= tlv->type_size + tlv->len_size) {
+                return NULL;
+            }
+            *value_len = size - tlv->type_size - tlv->len_size;
+        } else {
+            *value_len = size;
         }
-        *value_len = tlv->len_inclusive ? size - tlv->type_size - tlv->len_size : size;
     } else {
         return NULL;
     }
