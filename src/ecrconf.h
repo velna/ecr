@@ -10,6 +10,7 @@
 
 #include <inttypes.h>
 #include <stddef.h>
+#include <stdbool.h>
 #include <sys/types.h>
 
 typedef enum {

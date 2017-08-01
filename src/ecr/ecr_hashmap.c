@@ -114,6 +114,24 @@ void * ecr_hashmap_put(ecr_hashmap_t *map, const void *key, size_t key_size, voi
     return ret;
 }
 
+void ecr_hashmap_put_all(ecr_hashmap_t *src, ecr_hashmap_t *dst) {
+    ecr_hash_node_t *node;
+    int i;
+    if (src->lock) {
+        pthread_rwlock_rdlock(&src->rwlock);
+    }
+    for (i = 0; i < src->capacity; i++) {
+        node = src->table[i];
+        while (node) {
+            ecr_hashmap_put(dst, node->key, node->key_size, node->value);
+            node = node->next;
+        }
+    }
+    if (src->lock) {
+        pthread_rwlock_unlock(&src->rwlock);
+    }
+}
+
 void * ecr_hashmap_get(ecr_hashmap_t *map, const void *key, size_t key_size) {
     void *ret = NULL;
     u_int32_t hash;

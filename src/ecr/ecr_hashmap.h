@@ -51,6 +51,8 @@ int ecr_hashmap_init(ecr_hashmap_t *map, size_t capacity, int flag);
 
 void * ecr_hashmap_put(ecr_hashmap_t *map, const void *key, size_t key_size, void *value);
 
+void ecr_hashmap_put_all(ecr_hashmap_t *src, ecr_hashmap_t *dst);
+
 void * ecr_hashmap_get(ecr_hashmap_t *map, const void *key, size_t key_size);
 
 void * ecr_hashmap_get_or_create(ecr_hashmap_t *map, const void *key, size_t key_size,
