@@ -15,7 +15,7 @@ static ecr_hm_expr_t* ecr_hm_expr_new_leaf(int id, ecr_fixedhash_ctx_t *hash_ctx
     ecr_hm_expr_t *expr = calloc(1, sizeof(ecr_hm_expr_t));
     expr->type = HM_LEAF;
     expr->leaf.id = id;
-    expr->leaf.field.str = field;
+    expr->leaf.field.str = strdup(field);
     expr->leaf.field.key = ecr_fixedhash_getkey(hash_ctx, field, strlen(field));
     expr->leaf.matcher = matcher;
     return expr;
@@ -67,15 +67,16 @@ static void ecr_hm_expr_free(ecr_hm_expr_t *expr) {
     if (expr) {
         switch (expr->type) {
         case HM_LEAF:
+            free_to_null(expr->leaf.field.str);
             break;
         case HM_COMPOSITE:
             switch (expr->composite.logic) {
-            case BWL_AND:
-            case BWL_OR:
+            case HM_AND:
+            case HM_OR:
                 ecr_hm_expr_free(expr->composite.left);
                 ecr_hm_expr_free(expr->composite.right);
                 break;
-            case BWL_NOT:
+            case HM_NOT:
                 ecr_hm_expr_free(expr->composite.left);
                 break;
             }
@@ -90,7 +91,6 @@ static ecr_hm_expr_t * ecr_hm_expr_parse_leaf(ecr_hm_data_t *data, ecr_hm_source
     char *matcher_name, *var_name;
     ecr_hm_matcher_t *matcher;
     ecr_list_t *values;
-    int i;
     int expr_id;
 
     if (!field) {
@@ -186,11 +186,10 @@ static ecr_hm_expr_t* ecr_hm_expr_parse(ecr_hm_data_t *data, ecr_hm_source_data_
 
 }
 
-static ecr_hm_expr_t* ecr_hm_expr_new(ecr_hm_data_t *data, ecr_hm_source_data_t *source_data) {
-    ecr_hm_expr_t *expr, *expr_new, *expr_parent;
+static int ecr_hm_expr_new(ecr_hm_data_t *data, ecr_hm_source_data_t *source_data, ecr_hm_expr_t **expr_out) {
+    ecr_hm_expr_t *expr, *expr_new, *expr_parent = NULL;
     char *expr_str, *expr_dup, *s;
     ecr_hashmap_iter_t iter;
-    char *expr_str;
 
     ecr_hashmap_iter_init(&iter, &source_data->expr_set);
     while (ecr_hashmap_iter_next(&iter, (void**) &expr_str, NULL, NULL) == 0) {
@@ -214,15 +213,15 @@ static ecr_hm_expr_t* ecr_hm_expr_new(ecr_hm_data_t *data, ecr_hm_source_data_t 
             expr_parent = expr_new;
         }
     }
-    return expr_parent;
+    *expr_out = expr_parent;
+    return 0;
 }
 
 static bool ecr_hm_expr_matches(ecr_hm_expr_t *expr, ecr_fixedhash_t *targets, ecr_hm_result_t *result) {
     bool matches = false;
     ecr_hm_match_status_t match_status;
-    ecr_list_t *match_expr_id_list;
     ecr_str_t *target;
-    int i, expr_id;
+    ecr_hm_match_context_t match_context;
 
     switch (expr->type) {
     case HM_LEAF:
@@ -230,16 +229,16 @@ static bool ecr_hm_expr_matches(ecr_hm_expr_t *expr, ecr_fixedhash_t *targets, e
         target = ecr_fixedhash_get(targets, expr->leaf.field.key);
         switch (match_status) {
         case HM_UNDEF:
-            match_expr_id_list = ecr_hm_matcher_matches(expr->leaf.matcher, target);
-            for (i = 0; i < match_expr_id_list->size; i++) {
-                expr_id = (int) (match_expr_id_list->data[i] - NULL);
-                if (expr_id == expr->leaf.id) {
-                    matches = true;
-                }
-                ecr_hm_result_set_expr(result, expr_id, true, &expr->leaf.field, target);
-            }
-            if (!matches) {
+            match_context.expr = expr;
+            match_context.result = result;
+            match_context.target = target;
+            ecr_hm_matcher_matches(expr->leaf.matcher, &match_context);
+            match_status = ecr_hm_result_get_expr(result, expr->leaf.id);
+            if (match_status == HM_UNDEF) {
                 ecr_hm_result_set_expr(result, expr->leaf.id, false, &expr->leaf.field, target);
+                matches = false;
+            } else {
+                matches = true;
             }
             break;
         case HM_MATCH:

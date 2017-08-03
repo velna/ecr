@@ -9,6 +9,7 @@
 #define SRC_ECR_ECR_URLMATCH_H_
 
 #include "ecr_hashmap.h"
+#include <stdio.h>
 
 typedef ecr_hashmap_t ecr_urlmatch_t;
 

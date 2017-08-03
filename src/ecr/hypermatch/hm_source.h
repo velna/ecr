@@ -21,7 +21,7 @@ static ecr_hm_source_t* ecr_hm_source_new(ecr_hm_t *hm, const char *uri) {
 
 static void ecr_hm_source_free(ecr_hm_source_t *source) {
     free_to_null(source->uri);
-    ecr_hashmap_destory(&source->attrs, ecr_hashmap_free_value_handler);
+    ecr_hashmap_destroy(&source->attrs, ecr_hashmap_free_value_handler);
     ecr_hm_expr_free(source->expr);
     free_to_null(source);
 }
@@ -39,7 +39,9 @@ static ecr_hm_status_t ecr_hm_source_compile(ecr_hm_source_t *source, ecr_hm_dat
         return HM_UNMODIFIED;
     }
     source_data->source = source;
-    source->expr = ecr_hm_expr_new(data, source_data);
+    if (ecr_hm_expr_new(data, source_data, &source->expr)) {
+        return HM_ERROR;
+    }
     return HM_OK;
 }
 

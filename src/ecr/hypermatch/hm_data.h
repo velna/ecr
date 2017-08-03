@@ -70,7 +70,7 @@ static ecr_hm_status_t ecr_hm_data_compile(ecr_hm_data_t *data, bool force_reloa
     int i;
 
     ecr_hashmap_iter_init(&iter, &data->source_map);
-    while (ecr_hashmap_iter_next(&iter, NULL, NULL, &source) == 0) {
+    while (ecr_hashmap_iter_next(&iter, NULL, NULL, (void**) &source) == 0) {
         status = ecr_hm_source_compile(source, data, status == HM_OK ? 1 : force_reload);
         if (status == HM_OK) {
             // do nothing
@@ -89,7 +89,7 @@ static ecr_hm_status_t ecr_hm_data_compile(ecr_hm_data_t *data, bool force_reloa
             }
         }
         ecr_hashmap_iter_init(&iter, &data->matcher_map);
-        while (ecr_hashmap_iter_next(&iter, NULL, NULL, &matcher) == 0) {
+        while (ecr_hashmap_iter_next(&iter, NULL, NULL, (void**) &matcher) == 0) {
             ecr_hm_matcher_compile(matcher);
         }
     }
@@ -110,7 +110,7 @@ static bool ecr_hm_data_matches(ecr_hm_data_t *data, ecr_fixedhash_t *targets, e
     }
     ecr_hm_result_clear(result);
     ecr_hashmap_iter_init(&iter, &data->source_map);
-    while (ecr_hashmap_iter_next(&iter, NULL, NULL, &source) == 0) {
+    while (ecr_hashmap_iter_next(&iter, NULL, NULL, (void**) &source) == 0) {
         if (ecr_hm_source_matches(source, targets, result)) {
             matches = true;
         }
@@ -126,13 +126,44 @@ static void ecr_hm_data_destroy(ecr_hm_data_t *data) {
     free(data);
 }
 
-static ecr_hm_matcher_t* ecr_hm_data_get_matcher(ecr_hm_data_t *data, const char *field, const char *matcher_name) {
+static ecr_hm_matcher_t* ecr_hm_create_matcher(ecr_hm_t *hm, const char *matcher_name) {
+    ecr_hm_matcher_reg_t *matcher_reg;
 
+    matcher_reg = ecr_hashmap_get(&hm->matcher_registry, matcher_name, strlen(matcher_name));
+    if (!matcher_reg) {
+        return NULL;
+    }
+    return ecr_hm_matcher_new(matcher_reg);
+}
+
+static ecr_hm_matcher_t* ecr_hm_data_get_matcher(ecr_hm_data_t *data, const char *field, const char *matcher_name) {
+    ecr_str_t key;
+    ecr_hm_matcher_t *matcher;
+
+    key.len = asprintf(&key.ptr, "%s %s", field, matcher_name);
+    matcher = ecr_hashmap_get(&data->matcher_map, key.ptr, key.len);
+    if (!matcher) {
+        matcher = ecr_hm_create_matcher(data->hm, matcher_name);
+    }
+    return matcher;
 }
 
 static int ecr_hm_data_get_expr_id(ecr_hm_data_t *data, int source_id, const char *field, const char *matcher_name,
         const char *var_name) {
+    ecr_str_t key;
+    int expr_id;
 
+    if (!var_name) {
+        key.len = asprintf(&key.ptr, "%d:%s %s", source_id, field, matcher_name);
+    } else {
+        key.len = asprintf(&key.ptr, "%d:%s %s %s", source_id, field, matcher_name, var_name);
+    }
+    expr_id = (int) (ecr_hashmap_get(&data->expr_id_map, key.ptr, key.len) - NULL);
+    if (!expr_id) {
+        expr_id = data->next_expr_id++;
+        ecr_hashmap_put(&data->expr_id_map, key.ptr, key.len, (NULL + expr_id));
+    }
+    return expr_id;
 }
 
 #endif /* SRC_ECR_HYPERMATCH_HM_DATA_H_ */

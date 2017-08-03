@@ -24,11 +24,13 @@ static void ecr_hm_matcher_free(ecr_hm_matcher_t *matcher) {
 }
 
 static void ecr_hm_matcher_compile(ecr_hm_matcher_t *matcher) {
-    matcher->reg->compile(matcher->data);
+    if (matcher->reg->compile) {
+        matcher->reg->compile(matcher->data);
+    }
 }
 
-static ecr_list_t* ecr_hm_matcher_matches(ecr_hm_matcher_t *matcher, ecr_str_t *target) {
-    return matcher->reg->matches(matcher->data, target);
+static ECR_INLINE void ecr_hm_matcher_matches(ecr_hm_matcher_t *matcher, ecr_hm_match_context_t *match_ctx) {
+    matcher->reg->matches(matcher->data, match_ctx);
 }
 
 static int ecr_hm_matcher_add_values(ecr_hm_matcher_t *matcher, ecr_list_t *values, int expr_id) {

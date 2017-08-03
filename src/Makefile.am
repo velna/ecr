@@ -8,6 +8,7 @@ lib_LTLIBRARIES = libecr.la
 #######################################
 # Build information for each library
 nobase_include_HEADERS = ecr.h ecrconf.h \
+	ecr/hypermatch/hm.h \
 	ecr/ecr_app.h \
 	ecr/ecr_bloomfilter.h \
 	ecr/ecr_buf.h \
@@ -48,6 +49,11 @@ nobase_include_HEADERS = ecr.h ecrconf.h \
 
 # Sources for ecr
 libecr_la_SOURCES = \
+	ecr/hypermatch/hm.c \
+	ecr/hypermatch/hm_equals_matcher.c \
+	ecr/hypermatch/hm_exists_matcher.c \
+	ecr/hypermatch/hm_urlmatch_matcher.c \
+	ecr/hypermatch/hm_wumanber_matcher.c \
 	ecr/ecr_version.c \
 	ecr/ecr_app.c \
 	ecr/ecr_bloomfilter.c \
