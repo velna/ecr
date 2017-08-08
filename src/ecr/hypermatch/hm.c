@@ -13,6 +13,7 @@
 #include "hm_result.h"
 #include "hm_matcher.h"
 #include "hm_expr.h"
+#include "hm_source_data.h"
 #include "hm_source.h"
 #include "hm_data.h"
 
@@ -42,22 +43,23 @@ int ecr_hm_reg_matcher(ecr_hm_t *hm, ecr_hm_matcher_reg_t *matcher_reg) {
     return 0;
 }
 
+ecr_hm_matcher_reg_t* ecr_hm_get_matcher_reg(ecr_hm_t *hm, const char *name) {
+    if (!name) {
+        return NULL;
+    }
+    return ecr_hashmap_get(&hm->matcher_registry, name, strlen(name));
+}
+
 int ecr_hm_reg_loader(ecr_hm_t *hm, ecr_hm_loader_t *loader) {
-    ecr_hashmap_put(&hm->loader_registry, loader->name, strlen(loader->name), loader);
+    ecr_hashmap_put(&hm->loader_registry, loader->scheme, strlen(loader->scheme), loader);
     return 0;
 }
 
-ecr_hm_loader_t* ecr_hm_find_loader(ecr_hm_t *hm, const char *uri, ecr_hm_loader_t *default_loader) {
-    ecr_hm_loader_t *loader;
-    char *s = strstr(uri, "://");
-    if (s && s != uri) {
-        s = strndup(uri, s - uri);
-        loader = ecr_hashmap_get(&hm->loader_registry, s, strlen(s));
-        free(s);
-    } else {
-        loader = ecr_hashmap_get(&hm->loader_registry, uri, strlen(uri));
+ecr_hm_loader_t* ecr_hm_find_loader(ecr_hm_t *hm, const char *scheme) {
+    if (!scheme) {
+        return NULL;
     }
-    return loader ? default_loader : loader;
+    return ecr_hashmap_get(&hm->loader_registry, scheme, strlen(scheme));
 }
 
 ecr_hm_source_t* ecr_hm_add(ecr_hm_t *hm, const char *uri) {
@@ -70,7 +72,9 @@ ecr_hm_source_t* ecr_hm_add(ecr_hm_t *hm, const char *uri) {
         ecr_hm_data_copy_sources(data, hm->data);
     }
     source = ecr_hm_source_new(hm, uri);
-    ecr_hm_data_add(data, source);
+    if (source) {
+        ecr_hm_data_add(data, source);
+    }
     pthread_mutex_unlock(&hm->lock);
     return source;
 }

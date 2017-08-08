@@ -9,8 +9,9 @@
 #define SRC_ECR_HYPERMATCH_HM_H_
 
 #include "ecrconf.h"
-#include "../ecr_hashmap.h"
-#include "../ecr_fixedhashmap.h"
+#include "ecr_hashmap.h"
+#include "ecr_uri.h"
+#include "ecr_fixedhashmap.h"
 
 #define ECR_HM_ERRBUF_SIZE      256
 
@@ -68,7 +69,7 @@ typedef struct ecr_hm_expr_s {
 
 typedef struct {
     int id;
-    char *uri;
+    ecr_uri_t uri;
     ecr_hm_t *hm;
     ecr_hashmap_t attrs;
     ecr_hm_expr_t *expr;
@@ -82,9 +83,12 @@ typedef struct {
 } ecr_hm_source_data_t;
 
 typedef struct {
-    const char *name;
-    ecr_hm_source_data_t* (*load)(ecr_hm_source_t *source, int force_reload);
-    ecr_list_t* (*load_values)(ecr_hm_source_t *source, const char *uri);
+    const char *scheme;
+    /**
+     * return -1 for error, 0 for unmodified, >0 for num of values actually loads.
+     */
+    int (*load)(ecr_hm_source_t *source, int force_reload, ecr_hm_source_data_t *source_data);
+    int (*load_values)(ecr_hm_source_t *source, ecr_uri_t *uri, ecr_list_t *values);
 } ecr_hm_loader_t;
 
 typedef struct {
@@ -137,15 +141,21 @@ extern ecr_hm_matcher_reg_t ecr_hm_exists_matcher_reg;
 extern ecr_hm_matcher_reg_t ecr_hm_wumanber_matcher_reg;
 extern ecr_hm_matcher_reg_t ecr_hm_urlmatch_matcher_reg;
 
+extern ecr_hm_loader_t ecr_hm_file_loader;
+
 int ecr_hm_init(ecr_hm_t *hm, ecr_fixedhash_ctx_t *fixedhash_ctx);
 
 void ecr_hm_destroy(ecr_hm_t *hm);
 
+#define ecr_hm_error(hm, fmt, ...) snprintf((hm)->errbuf, ECR_HM_ERRBUF_SIZE, fmt, ##__VA_ARGS__)
+
 int ecr_hm_reg_matcher(ecr_hm_t *hm, ecr_hm_matcher_reg_t *matcher_reg);
+
+ecr_hm_matcher_reg_t* ecr_hm_get_matcher_reg(ecr_hm_t *hm, const char *name);
 
 int ecr_hm_reg_loader(ecr_hm_t *hm, ecr_hm_loader_t *loader);
 
-ecr_hm_loader_t* ecr_hm_find_loader(ecr_hm_t *hm, const char *uri, ecr_hm_loader_t *default_loader);
+ecr_hm_loader_t* ecr_hm_find_loader(ecr_hm_t *hm, const char *scheme);
 
 ecr_hm_source_t* ecr_hm_add(ecr_hm_t *hm, const char *uri);
 

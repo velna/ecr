@@ -9,6 +9,7 @@ lib_LTLIBRARIES = libecr.la
 # Build information for each library
 nobase_include_HEADERS = ecr.h ecrconf.h \
 	ecr/hypermatch/hm.h \
+	ecr/hypermatch/hm_loader.h \
 	ecr/ecr_app.h \
 	ecr/ecr_bloomfilter.h \
 	ecr/ecr_buf.h \
@@ -51,6 +52,8 @@ nobase_include_HEADERS = ecr.h ecrconf.h \
 # Sources for ecr
 libecr_la_SOURCES = \
 	ecr/hypermatch/hm.c \
+	ecr/hypermatch/hm_loader.c \
+	ecr/hypermatch/hm_file_loader.c \
 	ecr/hypermatch/hm_equals_matcher.c \
 	ecr/hypermatch/hm_exists_matcher.c \
 	ecr/hypermatch/hm_urlmatch_matcher.c \
@@ -120,4 +123,4 @@ libecr_la_LDFLAGS = -version-info @ECR_VERSION@
 # Compiler options. Here we are adding the include directory
 # to be searched for headers included in the source code.
 
-libecr_la_CFLAGS = -Wall $(shell pkg-config --cflags libmongoc-1.0 zlib)
+libecr_la_CFLAGS = -Wall $(shell pkg-config --cflags libmongoc-1.0 zlib) -I$(top_srcdir)/src/ecr

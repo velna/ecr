@@ -95,7 +95,12 @@ int ecr_uri_init(ecr_uri_t *uri, const char *str) {
         return -1;
     }
 
-    return ecr_uri_set_fields(uri);
+    if (ecr_uri_set_fields(uri)) {
+        ecr_uri_destroy(uri);
+        return -1;
+    } else {
+        return 0;
+    }
 }
 
 int ecr_uri_resolve(ecr_uri_t *uri, const char *relative_uri, ecr_uri_t *uri_out) {
@@ -113,7 +118,12 @@ int ecr_uri_resolve(ecr_uri_t *uri, const char *relative_uri, ecr_uri_t *uri_out
         uriFreeUriMembersA(&uri_out->_uri);
         return -1;
     }
-    return ecr_uri_set_fields(uri_out);
+    if (ecr_uri_set_fields(uri_out)) {
+        ecr_uri_destroy(uri_out);
+        return -1;
+    } else {
+        return 0;
+    }
 }
 
 void ecr_uri_destroy(ecr_uri_t *uri) {

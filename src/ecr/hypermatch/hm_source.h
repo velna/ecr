@@ -14,35 +14,43 @@ static ecr_hm_source_t* ecr_hm_source_new(ecr_hm_t *hm, const char *uri) {
     ecr_hm_source_t *source = calloc(1, sizeof(ecr_hm_source_t));
     source->id = 0;
     source->hm = hm;
-    source->uri = strdup(uri);
+    if (ecr_uri_init(&source->uri, uri)) {
+        free(source);
+        return NULL;
+    }
     ecr_hashmap_init(&source->attrs, 16, 0);
     return source;
 }
 
 static void ecr_hm_source_free(ecr_hm_source_t *source) {
-    free_to_null(source->uri);
+    ecr_uri_destroy(&source->uri);
     ecr_hashmap_destroy(&source->attrs, ecr_hashmap_free_value_handler);
     ecr_hm_expr_free(source->expr);
     free_to_null(source);
 }
 
 static ecr_hm_status_t ecr_hm_source_compile(ecr_hm_source_t *source, ecr_hm_data_t *data, int force_reload) {
-    ecr_hm_source_data_t *source_data;
+    ecr_hm_source_data_t source_data;
     ecr_hm_loader_t *loader;
+    int rc;
 
-    loader = ecr_hm_find_loader(source->hm, source->uri, NULL);
+    loader = ecr_hm_find_loader(source->hm, source->uri.scheme);
     if (!loader) {
         return HM_ERROR;
     }
-    source_data = loader->load(source, force_reload);
-    if (!source_data) {
-        return HM_UNMODIFIED;
-    }
-    source_data->source = source;
-    if (ecr_hm_expr_new(data, source_data, &source->expr)) {
+    ecr_hm_source_data_init(&source_data, source);
+    rc = loader->load(source, force_reload, &source_data);
+    if (rc == -1) {
+        ecr_hm_source_data_destroy(&source_data);
         return HM_ERROR;
     }
-    return HM_OK;
+    if (rc == 0) {
+        ecr_hm_source_data_destroy(&source_data);
+        return HM_UNMODIFIED;
+    }
+    rc = ecr_hm_expr_new(data, &source_data, &source->expr);
+    ecr_hm_source_data_destroy(&source_data);
+    return rc ? HM_ERROR : HM_OK;
 }
 
 static bool ecr_hm_source_matches(ecr_hm_source_t *source, ecr_fixedhash_t *targets, ecr_hm_result_t *result) {
