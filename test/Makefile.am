@@ -20,6 +20,7 @@ ecr_test_LDFLAGS	=-lpthread -latomic_ops -lrt -lcrypto -lstdc++ -lssl -lsasl2
 run_test_SOURCES	= \
 	run_test.c \
 	util_crypto_test.c \
+	uri_test.c \
 	http_decoder_test.c \
 	ipdb_test.c \
 	template_test.c
@@ -37,7 +38,7 @@ run_test_LDADD		= \
 	/usr/local/lib/libcunit.a
 
 run_test_LDFLAGS	= \
-	-lpthread -latomic_ops -lrt -lcrypto -lstdc++ -lssl -lcurses -lsasl2
+	-lpthread -latomic_ops -lrt -lcrypto -lstdc++ -lssl -lcurses -lsasl2 -luriparser
 
 	
 stoi_SOURCES=stoi.c
