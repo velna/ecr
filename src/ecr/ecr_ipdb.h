@@ -14,9 +14,9 @@
 typedef struct {
     uint32_t start_ip;
     uint32_t end_ip;
-    uint8_t province;
-    uint8_t city;
-    uint8_t county;
+    uint32_t province;
+    uint32_t city;
+    uint32_t county;
 } ecr_ipdb_region_t;
 
 typedef struct {

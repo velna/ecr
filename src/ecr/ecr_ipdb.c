@@ -26,7 +26,7 @@ int ecr_ipdb_init(ecr_ipdb_t *ipdb, const char *ipdbfile) {
     FILE *file;
     char *start_ip = NULL, *end_ip = NULL, *line = NULL, *s, *token;
     size_t n = 0;
-    uint8_t province, city, county;
+    uint32_t province, city, county;
     ecr_ipdb_region_t *region;
 
     memset(ipdb, 0, sizeof(ecr_ipdb_t));
@@ -47,38 +47,42 @@ int ecr_ipdb_init(ecr_ipdb_t *ipdb, const char *ipdbfile) {
             continue;
         }
         start_ip = token;
+
         token = strtok_r(NULL, "\t", &s);
         if (!token) {
             continue;
         }
         end_ip = token;
+
         token = strtok_r(NULL, "\t", &s);
         if (!token) {
             continue;
         }
         //continent
+
         token = strtok_r(NULL, "\t", &s);
         if (!token) {
             continue;
         }
         //country
-        token = strtok_r(NULL, "\t", &s);
-        if (!token) {
-            continue;
-        }
-        province = (uint8_t) atoi(token);
 
         token = strtok_r(NULL, "\t", &s);
         if (!token) {
             continue;
         }
-        city = (uint8_t) atoi(token);
+        province = (uint32_t) atoi(token);
 
         token = strtok_r(NULL, "\t", &s);
         if (!token) {
             continue;
         }
-        county = (uint8_t) atoi(token);
+        city = (uint32_t) atoi(token);
+
+        token = strtok_r(NULL, "\t", &s);
+        if (!token) {
+            continue;
+        }
+        county = (uint32_t) atoi(token);
 
         region = malloc(sizeof(sizeof(ecr_ipdb_region_t)));
         inet_pton(AF_INET, start_ip, &region->start_ip);

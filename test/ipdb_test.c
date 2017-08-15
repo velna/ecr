@@ -22,7 +22,7 @@ static int cleanup(void) {
     return 0;
 }
 
-static void ipdb_test_query0(const char *ip, int expected_rc, uint8_t expected_province) {
+static void ipdb_test_query0(const char *ip, int expected_rc, uint32_t expected_province) {
     uint32_t ipv4;
     inet_pton(AF_INET, ip, &ipv4);
     ecr_ipdb_region_t region;
@@ -33,14 +33,14 @@ static void ipdb_test_query0(const char *ip, int expected_rc, uint8_t expected_p
 }
 
 static void ipdb_test_query() {
-    ipdb_test_query0("1.51.112.1", 0, 34);
-    ipdb_test_query0("139.122.224.0", 0, 81);
-    ipdb_test_query0("139.122.224.255", 0, 81);
-    ipdb_test_query0("139.122.233.2", 0, 81);
+    ipdb_test_query0("1.51.112.1", 0, 340000);
+    ipdb_test_query0("139.122.224.0", 0, 810000);
+    ipdb_test_query0("139.122.224.255", 0, 810000);
+    ipdb_test_query0("139.122.233.2", 0, 810000);
     ipdb_test_query0("140.1.2.3", -1, 0);
     ipdb_test_query0("1.1.1.1", -1, 0);
-    ipdb_test_query0("42.184.3.34", 0, 23);
-    ipdb_test_query0("61.240.232.3", 0, 43);
+    ipdb_test_query0("42.184.3.34", 0, 230000);
+    ipdb_test_query0("61.240.232.3", 0, 430000);
 }
 
 CU_TestInfo ipdb_cases[] = {
