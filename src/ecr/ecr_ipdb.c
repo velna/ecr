@@ -84,7 +84,7 @@ int ecr_ipdb_init(ecr_ipdb_t *ipdb, const char *ipdbfile) {
         }
         county = (uint32_t) atoi(token);
 
-        region = malloc(sizeof(sizeof(ecr_ipdb_region_t)));
+        region = malloc(sizeof(ecr_ipdb_region_t));
         inet_pton(AF_INET, start_ip, &region->start_ip);
         region->start_ip = ntohl(region->start_ip);
         inet_pton(AF_INET, end_ip, &region->end_ip);
@@ -96,6 +96,7 @@ int ecr_ipdb_init(ecr_ipdb_t *ipdb, const char *ipdbfile) {
     }
     fclose(file);
     ecr_list_sort(ipdb->regions, ecr_ipdb_region_compare_func);
+    free_to_null(line);
 
     return 0;
 }
