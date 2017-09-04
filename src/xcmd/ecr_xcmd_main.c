@@ -66,7 +66,7 @@ int main(int argc, const char** argv) {
 
     zmq_pollitem_t items[] = { { cmd_zmq_socket, 0, ZMQ_POLLIN, 0 } };
     zmq_poll(items, 1, 3 * 1000);
-    if (!items[0].revents & ZMQ_POLLIN) {
+    if (!(items[0].revents & ZMQ_POLLIN)) {
         printf("cmd receive timeout\n");
         return EXIT_CODE_ZMQ_RECEIVE_TIMEOUT;
     }

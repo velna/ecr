@@ -68,7 +68,7 @@ char *ecr_str_trim(char * s) {
 
 void ecr_string_trim(ecr_str_t *str, ecr_str_t *out) {
     char *cp = str->ptr;
-    size_t i = str->len - 1;
+    int i = str->len - 1;
 
     while (*cp && isspace(*cp)) {
         cp++;

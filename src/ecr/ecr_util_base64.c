@@ -16,7 +16,7 @@ static void ecr_base64_init_decode_table(const char *table, char *decode_table) 
     int i;
     memset(decode_table, -1, 127);
     for (i = 0; i < 64; i++) {
-        decode_table[(int)table[i]] = i;
+        decode_table[(int) table[i]] = i;
     }
 }
 
@@ -63,9 +63,8 @@ int ecr_base64_decode(const unsigned char *in, size_t inlen, unsigned char *out,
     char decode_table[128];
     ecr_base64_init_decode_table(BASE64_TABLE, decode_table);
     for (i = 0, j = 0; i < inlen; i += 4) {
-        if ((in[i] > 127 || (temp[0] = decode_table[in[i]])) < 0
-                || (in[i + 1] > 127 || (temp[1] = decode_table[in[i + 1]]) < 0)
-                || (in[i + 2] > 127 || (temp[2] = decode_table[in[i + 2]]) < 0)
+        if ((in[i] > 127 || (temp[0] = decode_table[in[i]]) < 0) || (in[i + 1] > 127 || (temp[1] =
+                decode_table[in[i + 1]]) < 0) || (in[i + 2] > 127 || (temp[2] = decode_table[in[i + 2]]) < 0)
                 || (in[i + 3] > 127 || (temp[3] = decode_table[in[i + 3]]) < 0)) {
             return -1;
         }
