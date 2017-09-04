@@ -2,6 +2,7 @@
 .cproject
 .settings
 .autotools
+.dirstamp
 
 *.Plo
 *.lai
