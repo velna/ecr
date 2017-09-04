@@ -17,7 +17,7 @@
 #define WM_MATCH_FULL       3
 
 #define WM_MIN_BLOCK        2
-#define WM_HASH(ptr)        *((u_int16_t*) (ptr))
+#define WM_HASH(ptr)        ((((ptr)[0] & 0xff) << 8) | ((ptr)[1] & 0xff))
 #define WM_TABLE_SIZE       65536
 
 int ecr_wm_init(ecr_wm_t * wm, size_t init_size) {

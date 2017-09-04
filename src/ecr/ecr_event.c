@@ -57,7 +57,7 @@ int ecr_event_module_init(ecr_event_context_t *ctx, ecr_config_t *conf) {
             L_INFO("%s module load ok.", module_name);
             if (module->data_size) {
                 module->_data_offset = ctx->data_size;
-                ctx->data_size += module->data_size;
+                ctx->data_size += ecr_align_default(module->data_size);
             } else {
                 module->_data_offset = 0;
             }

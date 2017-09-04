@@ -14,7 +14,9 @@
 #include <netinet/in.h>
 #include "ecr_util_crypto.h"
 
-#if __BYTE_ORDER == __LITTLE_ENDIAN
+//#if __BYTE_ORDER == __LITTLE_ENDIAN
+
+#if 0
 
 #define str1cmp(m, c0)                                                                      \
     ((m)[0] == c0)

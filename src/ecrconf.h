@@ -38,7 +38,10 @@ typedef enum {
         } \
     } while(0)
 
-#define offset_of(type, field) ((size_t)(&((type*)0)->field))
+#define offset_of(type, field)  ((size_t)(&((type*)0)->field))
+#define ECR_ALIGNMENT           sizeof(unsigned long)
+#define ecr_align(d, a)            (((d) + (a - 1)) & ~ (a - 1))
+#define ecr_align_default(d)            ecr_align(d, ECR_ALIGNMENT)
 
 typedef struct {
     char * ptr;

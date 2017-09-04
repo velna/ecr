@@ -1097,13 +1097,13 @@ ecr_bwl_result_t * ecr_bwl_result_init_mem(ecr_bwl_t *list, void *mem) {
     char *chmem = mem;
 
     ret = mem;
-    chmem += sizeof(ecr_bwl_result_t);
+    chmem += ecr_align_default(sizeof(ecr_bwl_result_t));
     ret->exprs.ptr = chmem;
-    chmem += (ret->exprs.len = list->data->next_expr_id);
+    chmem += ecr_align_default(ret->exprs.len = list->data->next_expr_id);
     ret->sources.ptr = chmem;
-    chmem += (ret->users_size = ret->sources.len = list->data->next_sid);
+    chmem += ecr_align_default(ret->users_size = ret->sources.len = list->data->next_sid);
     ret->users = (void**) chmem;
-    chmem += ret->users_size * sizeof(void*);
+    chmem += ecr_align_default(ret->users_size * sizeof(void*));
     ret->expr_items = (ecr_str_t**) chmem;
     ret->version = list->version;
 

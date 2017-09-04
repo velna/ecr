@@ -151,7 +151,13 @@ int ecr_bwl_reload(ecr_bwl_t *list);
 
 int ecr_bwl_check(ecr_bwl_t *list);
 
-#define ecr_bwl_result_memsize(list) (sizeof(ecr_bwl_result_t) + ((list)->data->next_expr_id + (list)->data->next_sid) * (1 + sizeof(void*)))
+#define ecr_bwl_result_memsize(list) ( \
+        ecr_align_default(sizeof(ecr_bwl_result_t)) \
+        + ecr_align_default((list)->data->next_expr_id) \
+        + ecr_align_default((list)->data->next_sid) \
+        + ecr_align_default((list)->data->next_expr_id * sizeof(void*)) \
+        + ecr_align_default((list)->data->next_sid * sizeof(void*)) \
+        )
 
 ecr_bwl_result_t * ecr_bwl_result_init_mem(ecr_bwl_t *list, void *mem);
 

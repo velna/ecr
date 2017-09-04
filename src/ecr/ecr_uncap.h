@@ -78,16 +78,14 @@ struct pppoe_hdr {
     uint16_t protocol;
 };
 
-int ecr_uncap(ecr_str_t *uc, const char *protos, ecr_uncap_result_t *results);
-
-int ecr_uncap_eth(ecr_str_t *uc, ecr_uncap_result_t* result);
-int ecr_uncap_dot1q(ecr_str_t * uc, ecr_uncap_result_t* r);
-int ecr_uncap_ip(ecr_str_t *uc, ecr_uncap_result_t* result);
-int ecr_uncap_gre(ecr_str_t *uc, ecr_uncap_result_t* result);
-int ecr_uncap_udp(ecr_str_t *uc, ecr_uncap_result_t* result);
-int ecr_uncap_tcp(ecr_str_t *uc, ecr_uncap_result_t* result);
-int ecr_uncap_gtp(ecr_str_t *uc, ecr_uncap_result_t* result);
-int ecr_uncap_gtpv2(ecr_str_t *uc, ecr_uncap_result_t* result);
-int ecr_uncap_pppoe(ecr_str_t *uc, ecr_uncap_result_t* result);
+int ecr_uncap_eth(ecr_str_t *uc, ecr_uncap_result_t *r, void *hdr_out);
+int ecr_uncap_dot1q(ecr_str_t *uc, ecr_uncap_result_t *r, void *hdr_out);
+int ecr_uncap_ip(ecr_str_t *uc, ecr_uncap_result_t *r, void *hdr_out);
+int ecr_uncap_gre(ecr_str_t *uc, ecr_uncap_result_t *r, void *hdr_out);
+int ecr_uncap_udp(ecr_str_t *uc, ecr_uncap_result_t *r, void *hdr_out);
+int ecr_uncap_tcp(ecr_str_t *uc, ecr_uncap_result_t *r, void *hdr_out);
+int ecr_uncap_gtp(ecr_str_t *uc, ecr_uncap_result_t *r, void *hdr_out);
+int ecr_uncap_gtpv2(ecr_str_t *uc, ecr_uncap_result_t *r, void *hdr_out);
+int ecr_uncap_pppoe(ecr_str_t *uc, ecr_uncap_result_t *r, void *hdr_out);
 
 #endif /* ECR_UNCAP_H_ */
