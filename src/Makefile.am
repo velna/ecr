@@ -17,6 +17,7 @@ nobase_include_HEADERS = ecr.h ecrconf.h \
 	ecr/ecr_cmd.h \
 	ecr/ecr_config.h \
 	ecr/ecr_counter.h \
+	ecr/ecr_event.h \
 	ecr/ecr_fixedhashmap.h \
 	ecr/ecr_getopt.h \
 	ecr/ecr_hashmap.h \
@@ -71,6 +72,7 @@ libecr_la_SOURCES = \
 	ecr/ecr_cmd.c \
 	ecr/ecr_config.c \
 	ecr/ecr_counter.c \
+	ecr/ecr_event.c \
 	ecr/ecr_fixedhashmap.c \
 	ecr/ecr_getopt.c \
 	ecr/ecr_hashmap.c \

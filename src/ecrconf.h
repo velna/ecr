@@ -38,6 +38,8 @@ typedef enum {
         } \
     } while(0)
 
+#define offset_of(type, field) ((size_t)(&((type*)0)->field))
+
 typedef struct {
     char * ptr;
     size_t len;
