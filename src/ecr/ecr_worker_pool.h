@@ -36,6 +36,7 @@ typedef struct {
 } ecr_work_space_t;
 
 struct ecr_worker_pool_s {
+    char *id;
     ecr_worker_pool_config_t config;
     pthread_mutex_t lock;
     ecr_list_t work_spaces;
@@ -49,7 +50,7 @@ typedef struct {
     void (*destroy)(ecr_worker_t *worker, void *user);
 } ecr_worker_pool_listener_t;
 
-int ecr_worker_pool_init(ecr_worker_pool_t *pool, ecr_worker_pool_config_t *config);
+int ecr_worker_pool_init(ecr_worker_pool_t *pool, const char *id, ecr_worker_pool_config_t *config);
 
 void ecr_worker_pool_add_listener(ecr_worker_pool_t *pool, ecr_worker_pool_listener_t *l);
 

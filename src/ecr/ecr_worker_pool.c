@@ -9,8 +9,10 @@
 #include "ecr_worker_pool.h"
 #include "ecr_util.h"
 #include <stdlib.h>
+#include <string.h>
 
-int ecr_worker_pool_init(ecr_worker_pool_t *pool, ecr_worker_pool_config_t *config) {
+int ecr_worker_pool_init(ecr_worker_pool_t *pool, const char *id, ecr_worker_pool_config_t *config) {
+    pool->id = strdup(id);
     pool->config = *config;
     pool->sched_work_space.worker.alive = 1;
     pool->sched_work_space.worker.pool = pool;
@@ -34,7 +36,7 @@ static void * ecr_worker_routine(void *user) {
     ecr_worker_pool_listener_t *listener;
     int i;
 
-    ecr_set_thread_name("wp-%d", work_space->worker.id);
+    ecr_set_thread_name("wp-%s-%d", pool->id, work_space->worker.id);
 
     pthread_mutex_lock(&pool->lock);
     for (i = 0; i < ecr_list_size(&pool->listeners); i++) {
@@ -93,7 +95,7 @@ static void * ecr_worker_schedule_routine(void *user) {
     ecr_worker_pool_t *pool = sched_ws->worker.pool;
     int i;
 
-    ecr_set_thread_name("wp-sched");
+    ecr_set_thread_name("wp-%s-sched", pool->id);
 
     for (i = 0; i < pool->config.init_size; i++) {
         ecr_worker_new(pool, sched_ws->worker_cb, sched_ws->data);
@@ -125,4 +127,5 @@ void ecr_worker_pool_destroy(ecr_worker_pool_t *pool) {
     ecr_list_destroy(&pool->work_spaces, ecr_list_free_value_handler);
     ecr_list_destroy(&pool->listeners, ecr_list_free_value_handler);
     pthread_mutex_destroy(&pool->lock);
+    free(pool->id);
 }
