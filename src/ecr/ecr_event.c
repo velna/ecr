@@ -33,8 +33,8 @@ int ecr_event_module_init(ecr_event_context_t *ctx, ecr_config_t *conf) {
             asprintf(&enable_conf_name, "%s.%s", module->name, "enable");
             asprintf(&disable_conf_name, "%s.%s", module->name, "disable");
         }
-        has_enable = ecr_config_get(conf, module->name, enable_conf_name, ECR_CFG_INT, &module_enable) == 0;
-        has_disable = ecr_config_get(conf, module->name, disable_conf_name, ECR_CFG_INT, &module_disable) == 0;
+        has_enable = (ecr_config_get(conf, NULL, enable_conf_name, ECR_CFG_INT, &module_enable) == 0);
+        has_disable = (ecr_config_get(conf, NULL, disable_conf_name, ECR_CFG_INT, &module_disable) == 0);
         if (has_enable && has_disable) {
             L_ERROR("can not define both configuration of %s and %s", enable_conf_name, disable_conf_name);
             free(enable_conf_name);
