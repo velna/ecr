@@ -28,10 +28,10 @@ ecr_list_t* ecr_hm_source_data_get_values(ecr_hm_source_data_t *source_data, con
 }
 
 void ecr_hm_source_data_add_expr(ecr_hm_source_data_t *source_data, const char *expr) {
-    ecr_hashmap_put(&source_data->expr_set, expr, strlen(expr), NULL);
+    ecr_hashmap_put(&source_data->expr_set, expr, strlen(expr) + 1, NULL);
 }
 
-int ecr_hm_load_from_stream(ecr_hm_source_t *source, FILE *stream, ecr_hm_source_data_t *source_data) {
+int ecr_hm_load_from_stream(ecr_hm_source_t *source, FILE *stream, ecr_hm_source_data_t *source_data, void *user) {
     char *line, *oline, *token, *save, *name, *value, *expr, *var_name, *matcher_name;
     size_t len;
     ssize_t nread;
@@ -120,7 +120,7 @@ int ecr_hm_load_from_stream(ecr_hm_source_t *source, FILE *stream, ecr_hm_source
                     ecr_hm_error(source->hm, "can not find loader at line %d: [%s].", ln, oline);
                     break;
                 }
-                frc = loader->load_values(source, &uri, ecr_hm_source_data_get_values(source_data, var_name));
+                frc = loader->load_values(source, &uri, ecr_hm_source_data_get_values(source_data, var_name), user);
                 ecr_uri_destroy(&uri);
                 if (-1 == frc) {
                     rc = -1;
@@ -136,7 +136,7 @@ int ecr_hm_load_from_stream(ecr_hm_source_t *source, FILE *stream, ecr_hm_source
     return rc;
 }
 
-int ecr_hm_load_values_from_stream(ecr_hm_source_t *source, FILE *stream, ecr_list_t *values) {
+int ecr_hm_load_values_from_stream(ecr_hm_source_t *source, FILE *stream, ecr_list_t *values, void *user) {
     char *line, *value;
     int n;
     size_t len;

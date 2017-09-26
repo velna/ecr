@@ -29,13 +29,24 @@ int ecr_hm_init(ecr_hm_t *hm, ecr_fixedhash_ctx_t *fixedhash_ctx) {
     return 0;
 }
 
+static void ecr_hm_loader_registr_free_value_handler(ecr_hashmap_t *map, void *key, size_t key_size, void *value) {
+    ecr_hm_loader_t *loader = value;
+    if (loader->destroy_cb) {
+        loader->destroy_cb(loader);
+    }
+}
+
 void ecr_hm_destroy(ecr_hm_t *hm) {
     ecr_hm_data_destroy(hm->data);
     ecr_hm_data_destroy(hm->next_data);
     ecr_hm_data_destroy(hm->tmp_data);
     ecr_hashmap_destroy(&hm->matcher_registry, NULL);
-    ecr_hashmap_destroy(&hm->loader_registry, NULL);
+    ecr_hashmap_destroy(&hm->loader_registry, ecr_hm_loader_registr_free_value_handler);
     pthread_mutex_destroy(&hm->lock);
+}
+
+void ecr_hm_dump(ecr_hm_t *hm, ecr_dumper_t *dumper) {
+    ecr_dump_field_object(dumper, "data", hm->data, (ecr_dumper_cb) ecr_hm_data_dump);
 }
 
 int ecr_hm_reg_matcher(ecr_hm_t *hm, ecr_hm_matcher_reg_t *matcher_reg) {
@@ -57,7 +68,7 @@ int ecr_hm_reg_loader(ecr_hm_t *hm, ecr_hm_loader_t *loader) {
 
 ecr_hm_loader_t* ecr_hm_find_loader(ecr_hm_t *hm, const char *scheme) {
     if (!scheme) {
-        return NULL;
+        return ecr_hashmap_get(&hm->loader_registry, "file", strlen("file"));
     }
     return ecr_hashmap_get(&hm->loader_registry, scheme, strlen(scheme));
 }
@@ -157,18 +168,20 @@ ecr_hm_result_t * ecr_hm_result_init_mem(ecr_hm_t *hm, void *mem, size_t mem_siz
     char *cp = mem;
     ecr_hm_result_t *result;
     result = (ecr_hm_result_t*) cp;
-    cp += sizeof(ecr_hm_result_t);
+    cp += ecr_align_default(sizeof(ecr_hm_result_t));
     result->version = hm->version;
     result->expr_match_list_size = hm->data->next_expr_id;
     result->expr_match_list = (ecr_hm_result_kv_t*) cp;
-    cp += result->expr_match_list_size * sizeof(ecr_hm_result_kv_t);
+    cp += ecr_align_default(result->expr_match_list_size * sizeof(ecr_hm_result_kv_t));
     result->source_match_list.len = hm->data->next_sid;
     result->source_match_list.ptr = cp;
     return NULL;
 }
 
 size_t ecr_hm_result_mem_size(ecr_hm_t *hm) {
-    return sizeof(ecr_hm_result_t) + hm->data->next_expr_id * sizeof(ecr_hm_result_kv_t) + hm->data->next_sid;
+    return ecr_align_default(sizeof(ecr_hm_result_t))
+            + ecr_align_default(hm->data->next_expr_id * sizeof(ecr_hm_result_kv_t))
+            + ecr_align_default(hm->data->next_sid);
 }
 
 ecr_hm_result_t * ecr_hm_result_new(ecr_hm_t *hm) {
@@ -191,11 +204,11 @@ ecr_hm_result_t * ecr_hm_result_new(ecr_hm_t *hm) {
         last_mem_size = mem_size;
         cp = mem;
         result = (ecr_hm_result_t*) cp;
-        cp += sizeof(ecr_hm_result_t);
+        cp += ecr_align_default(sizeof(ecr_hm_result_t));
         result->version = version;
         result->expr_match_list_size = hm->data->next_expr_id;
         result->expr_match_list = (ecr_hm_result_kv_t*) cp;
-        cp += result->expr_match_list_size * sizeof(ecr_hm_result_kv_t);
+        cp += ecr_align_default(result->expr_match_list_size * sizeof(ecr_hm_result_kv_t));
         result->source_match_list.len = hm->data->next_sid;
         result->source_match_list.ptr = cp;
     } while (hm->version != version);

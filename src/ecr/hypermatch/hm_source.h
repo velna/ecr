@@ -29,6 +29,27 @@ static void ecr_hm_source_free(ecr_hm_source_t *source) {
     free_to_null(source);
 }
 
+static void ecr_hm_source_dump(ecr_hm_source_t *source, ecr_dumper_t *dumper) {
+    ecr_hashmap_iter_t iter;
+    char *key_str;
+    ecr_str_t key;
+    void *value;
+
+    ecr_dump_field_format(dumper, "id", "%d", source->id);
+    ecr_dump_field_format(dumper, "uri", "%s", source->uri.string);
+
+    ecr_dump_start_field_object(dumper, "attributs");
+    ecr_hashmap_iter_init(&iter, &source->attrs);
+    while (ecr_hashmap_iter_next(&iter, (void**) &key.ptr, &key.len, (void**) &value) == 0) {
+        key_str = strndup(key.ptr, key.len);
+        ecr_dump_field_format(dumper, key_str, "%p", value);
+        free(key_str);
+    }
+    ecr_dump_end_field_object(dumper);
+
+    ecr_dump_field_object(dumper, "expr", source->expr, (ecr_dumper_cb) ecr_hm_expr_dump);
+}
+
 static ecr_hm_status_t ecr_hm_source_compile(ecr_hm_source_t *source, ecr_hm_data_t *data, int force_reload) {
     ecr_hm_source_data_t source_data;
     ecr_hm_loader_t *loader;
@@ -36,10 +57,11 @@ static ecr_hm_status_t ecr_hm_source_compile(ecr_hm_source_t *source, ecr_hm_dat
 
     loader = ecr_hm_find_loader(source->hm, source->uri.scheme);
     if (!loader) {
+        ecr_hm_error(source->hm, "can not find loader of schme '%s'.", source->uri.scheme);
         return HM_ERROR;
     }
     ecr_hm_source_data_init(&source_data, source);
-    rc = loader->load(source, force_reload, &source_data);
+    rc = loader->load(source, force_reload, &source_data, loader->user);
     if (rc == -1) {
         ecr_hm_source_data_destroy(&source_data);
         return HM_ERROR;

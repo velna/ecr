@@ -30,6 +30,46 @@ static ecr_hm_expr_t* ecr_hm_expr_new_composite(ecr_hm_logic_t logic, ecr_hm_exp
     return expr;
 }
 
+static void ecr_hm_expr_dump0(ecr_hm_expr_t *expr, ecr_dumper_t *dumper, int *or) {
+    switch (expr->type) {
+    case HM_LEAF:
+        if (or) {
+            ecr_dump_field_name(dumper, "or");
+        }
+        fprintf(dumper->stream, "%d", expr->leaf.id);
+        break;
+    case HM_COMPOSITE:
+        if (or && (expr->composite.logic == HM_OR)) {
+            ecr_hm_expr_dump0(expr->composite.right, dumper, or);
+            ecr_hm_expr_dump0(expr->composite.left, dumper, or);
+        } else {
+            if (or) {
+                ecr_dump_field_name(dumper, "or");
+            }
+            fputc('(', dumper->stream);
+            if (expr->composite.logic == HM_NOT) {
+                fprintf(dumper->stream, "not ");
+                ecr_hm_expr_dump0(expr->composite.left, dumper, NULL);
+            } else {
+                ecr_hm_expr_dump0(expr->composite.right, dumper, NULL);
+                if (expr->composite.logic == HM_AND) {
+                    fprintf(dumper->stream, " and ");
+                } else if (expr->composite.logic == HM_OR) {
+                    fprintf(dumper->stream, " or ");
+                }
+                ecr_hm_expr_dump0(expr->composite.left, dumper, NULL);
+            }
+            fputc(')', dumper->stream);
+        }
+        break;
+    }
+}
+
+static void ecr_hm_expr_dump(ecr_hm_expr_t *expr, ecr_dumper_t *dumper) {
+    int or = 1;
+    ecr_hm_expr_dump0(expr, dumper, &or);
+}
+
 static char * ecr_hm_expr_normalize(const char *str) {
     char *expr = malloc(strlen(str) * 4);
     const char *s;

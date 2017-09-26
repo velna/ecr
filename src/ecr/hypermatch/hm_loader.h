@@ -11,9 +11,9 @@
 #include "ecrconf.h"
 #include "hm.h"
 
-int ecr_hm_load_from_stream(ecr_hm_source_t *source, FILE *stream, ecr_hm_source_data_t *source_data);
+int ecr_hm_load_from_stream(ecr_hm_source_t *source, FILE *stream, ecr_hm_source_data_t *source_data, void *user);
 
-int ecr_hm_load_values_from_stream(ecr_hm_source_t *source, FILE *stream, ecr_list_t *values);
+int ecr_hm_load_values_from_stream(ecr_hm_source_t *source, FILE *stream, ecr_list_t *values, void *user);
 
 void ecr_hm_source_data_add_value(ecr_hm_source_data_t *source_data, const char *var_name, const char *value);
 

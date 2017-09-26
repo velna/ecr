@@ -23,6 +23,11 @@ static void ecr_hm_matcher_free(ecr_hm_matcher_t *matcher) {
     free_to_null(matcher);
 }
 
+static void ecr_hm_matcher_dump(ecr_hm_matcher_t *matcher, ecr_dumper_t *dumper) {
+    ecr_dump_field_format(dumper, "name", "%s", matcher->reg->name);
+    ecr_dump_field_format(dumper, "size", "%ld", matcher->reg->size(matcher->data));
+}
+
 static void ecr_hm_matcher_compile(ecr_hm_matcher_t *matcher) {
     if (matcher->reg->compile) {
         matcher->reg->compile(matcher->data);

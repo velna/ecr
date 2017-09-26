@@ -22,6 +22,7 @@ run_test_SOURCES	= \
 	util_crypto_test.c \
 	uri_test.c \
 	http_decoder_test.c \
+	hypermatch_test.c \
 	ipdb_test.c \
 	template_test.c
 

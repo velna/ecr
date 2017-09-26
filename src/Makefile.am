@@ -10,6 +10,7 @@ lib_LTLIBRARIES = libecr.la
 nobase_include_HEADERS = ecr.h ecrconf.h \
 	ecr/hypermatch/hm.h \
 	ecr/hypermatch/hm_loader.h \
+	ecr/hypermatch/hm_mongo_loader.h \
 	ecr/ecr_app.h \
 	ecr/ecr_bloomfilter.h \
 	ecr/ecr_buf.h \
@@ -17,6 +18,7 @@ nobase_include_HEADERS = ecr.h ecrconf.h \
 	ecr/ecr_cmd.h \
 	ecr/ecr_config.h \
 	ecr/ecr_counter.h \
+	ecr/ecr_dumper.h \
 	ecr/ecr_event.h \
 	ecr/ecr_fixedhashmap.h \
 	ecr/ecr_getopt.h \
@@ -47,6 +49,7 @@ nobase_include_HEADERS = ecr.h ecrconf.h \
 	ecr/ecr_urlmatch.h \
 	ecr/ecr_util.h \
 	ecr/ecr_util_crypto.h \
+	ecr/ecr_util_mongoc.h \
 	ecr/ecr_worker_pool.h \
 	ecr/ecr_wumanber.h
 
@@ -55,6 +58,7 @@ libecr_la_SOURCES = \
 	ecr/hypermatch/hm.c \
 	ecr/hypermatch/hm_loader.c \
 	ecr/hypermatch/hm_file_loader.c \
+	ecr/hypermatch/hm_mongo_loader.c \
 	ecr/hypermatch/hm_equals_matcher.c \
 	ecr/hypermatch/hm_exists_matcher.c \
 	ecr/hypermatch/hm_urlmatch_matcher.c \
@@ -72,6 +76,7 @@ libecr_la_SOURCES = \
 	ecr/ecr_cmd.c \
 	ecr/ecr_config.c \
 	ecr/ecr_counter.c \
+	ecr/ecr_dumper.c \
 	ecr/ecr_event.c \
 	ecr/ecr_fixedhashmap.c \
 	ecr/ecr_getopt.c \
@@ -109,6 +114,7 @@ libecr_la_SOURCES = \
 	ecr/ecr_util_crypto.c \
 	ecr/ecr_util_hash.c \
 	ecr/ecr_util_inet.c \
+	ecr/ecr_util_mongoc.c \
 	ecr/ecr_util_string.c \
 	ecr/ecr_util_zmq.c \
 	ecr/ecr_worker_pool.c \

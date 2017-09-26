@@ -183,35 +183,23 @@
 
 char * ecr_str_tok(ecr_str_t *str, const char *delims, ecr_str_t *out);
 char * ecr_str_tok_replace(ecr_str_t *str, const char *delims, char replace_ch, ecr_str_t *out);
-
 char *ecr_str_trim(char *s);
-
 void ecr_string_trim(ecr_str_t *str, ecr_str_t *out);
-
 char *ecr_str_tolower(char *s);
-
 ecr_str_t* ecr_str_dup(ecr_str_t *to, ecr_str_t *from);
-
 size_t ecr_str_rcspn(const char *s, size_t n, const char *stopset);
-
 int ecr_str_cast(const char *str, ecr_type_t type, void *out);
-
 size_t ecr_mem_cspn(const void *mem, size_t n, const char *stopset);
-
 size_t ecr_mem_rcspn(const void *mem, size_t n, const char *stopset);
 
 void ecr_binary_dump(FILE *out, const void *bin, size_t len);
 
 void ecr_crc32_mix(const unsigned char *s, unsigned int len, void *out);
-
 void ecr_crc32_hash_mix(const void *s, int len, uint32_t seed, void *out);
-
 uint32_t ecr_crc32_ch(uint32_t crc_magic, char ch);
 
 void ecr_murmur_hash3_x86_32(const void *key, int len, uint32_t seed, void *out);
-
 uint64_t ecr_murmur_hash2_x64(const void *key, int len, uint32_t seed);
-
 void ecr_murmur_hash3_x64_128(const void *key, const int len, const uint32_t seed, void *out);
 
 void ecr_sha1_hex(const void *data, size_t size, char *to);
