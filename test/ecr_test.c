@@ -73,50 +73,50 @@ void ecr_test_gzip() {
     fclose(gzfile);
 }
 
-void ecr_test_tlv() {
-    ecr_tlv_t tlv;
-    ecr_buf_t buf;
-    char data[4096];
-    int i = 0x12345678;
-    char c = 'b';
-    short s = 0x1234;
-    long l = 0x1234567812345678;
-    char *str = "hi, my name is velna.";
-
-    ecr_tlv_t tlv2;
-    size_t type, len;
-    int *pi;
-    char *pc;
-    short *ps;
-    long *pl;
-    char *pstr;
-
-    ecr_buf_init(&buf, data, 4096);
-
-    ecr_tlv_init(&tlv, 1, 1, &buf);
-    ecr_tlv_append(&tlv, 1, &i, sizeof(int));
-    ecr_tlv_append(&tlv, 2, &c, sizeof(char));
-    ecr_tlv_append(&tlv, 3, &s, sizeof(short));
-    ecr_tlv_append(&tlv, 4, &l, sizeof(long));
-    ecr_tlv_append(&tlv, 5, str, strlen(str) + 1);
-    ecr_buf_flip(&buf);
-
-    ecr_binary_dump(stdout, ecr_buf_data(&buf), ecr_buf_size(&buf));
-
-    ecr_tlv_init(&tlv2, 1, 1, &buf);
-
-    pi = ecr_tlv_get(&tlv2, &type, &len);
-    printf("%lu, %lu, %x\n", type, len, *pi);
-    pc = ecr_tlv_get(&tlv2, &type, &len);
-    printf("%lu, %lu, %c\n", type, len, *pc);
-    ps = ecr_tlv_get(&tlv2, &type, &len);
-    printf("%lu, %lu, %hx\n", type, len, *ps);
-    pl = ecr_tlv_get(&tlv2, &type, &len);
-    printf("%lu, %lu, %lx\n", type, len, *pl);
-    pstr = ecr_tlv_get(&tlv2, &type, &len);
-    printf("%lu, %lu, %s\n", type, len, pstr);
-
-}
+//void ecr_test_tlv() {
+//    ecr_tlv_t tlv;
+//    ecr_buf_t buf;
+//    char data[4096];
+//    int i = 0x12345678;
+//    char c = 'b';
+//    short s = 0x1234;
+//    long l = 0x1234567812345678;
+//    char *str = "hi, my name is velna.";
+//
+//    ecr_tlv_t tlv2;
+//    size_t type, len;
+//    int *pi;
+//    char *pc;
+//    short *ps;
+//    long *pl;
+//    char *pstr;
+//
+//    ecr_buf_init(&buf, data, 4096);
+//
+//    ecr_tlv_init(&tlv, 1, 1, &buf);
+//    ecr_tlv_append(&tlv, 1, &i, sizeof(int));
+//    ecr_tlv_append(&tlv, 2, &c, sizeof(char));
+//    ecr_tlv_append(&tlv, 3, &s, sizeof(short));
+//    ecr_tlv_append(&tlv, 4, &l, sizeof(long));
+//    ecr_tlv_append(&tlv, 5, str, strlen(str) + 1);
+//    ecr_buf_flip(&buf);
+//
+//    ecr_binary_dump(stdout, ecr_buf_data(&buf), ecr_buf_size(&buf));
+//
+//    ecr_tlv_init(&tlv2, 1, 1, &buf);
+//
+//    pi = ecr_tlv_get(&tlv2, &type, &len);
+//    printf("%lu, %lu, %x\n", type, len, *pi);
+//    pc = ecr_tlv_get(&tlv2, &type, &len);
+//    printf("%lu, %lu, %c\n", type, len, *pc);
+//    ps = ecr_tlv_get(&tlv2, &type, &len);
+//    printf("%lu, %lu, %hx\n", type, len, *ps);
+//    pl = ecr_tlv_get(&tlv2, &type, &len);
+//    printf("%lu, %lu, %lx\n", type, len, *pl);
+//    pstr = ecr_tlv_get(&tlv2, &type, &len);
+//    printf("%lu, %lu, %s\n", type, len, pstr);
+//
+//}
 
 void ecr_test_pkware() {
     const char *password = "abcd";

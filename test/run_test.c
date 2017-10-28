@@ -17,6 +17,8 @@ extern CU_SuiteInfo ipdb_suites[];
 extern CU_SuiteInfo crypto_suites[];
 extern CU_SuiteInfo uri_suites[];
 extern CU_SuiteInfo hypermatch_suites[];
+extern CU_SuiteInfo buf_suites[];
+extern CU_SuiteInfo tlv_suites[];
 
 static void add_tests() {
     CU_register_suites(http_decoder_suites);
@@ -25,6 +27,8 @@ static void add_tests() {
     CU_register_suites(crypto_suites);
     CU_register_suites(uri_suites);
     CU_register_suites(hypermatch_suites);
+    CU_register_suites(buf_suites);
+    CU_register_suites(tlv_suites);
 }
 
 int main(int argc, char **argv) {

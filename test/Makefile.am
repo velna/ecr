@@ -19,12 +19,14 @@ ecr_test_LDFLAGS	=-lpthread -latomic_ops -lrt -lcrypto -lstdc++ -lssl -lsasl2
 
 run_test_SOURCES	= \
 	run_test.c \
+	buf_test.c \
 	util_crypto_test.c \
 	uri_test.c \
 	http_decoder_test.c \
 	hypermatch_test.c \
 	ipdb_test.c \
-	template_test.c
+	template_test.c \
+	tlv_test.c
 
 run_test_CFLAGS	=-Wall $(shell pkg-config --cflags libmongoc-1.0)
 
