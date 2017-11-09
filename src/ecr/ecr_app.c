@@ -18,15 +18,31 @@
 #include <time.h>
 #include <zmq.h>
 
+typedef struct {
+    uint64_t timestamp;
+    ecr_hashmap_t data;
+} ecr_app_user_stat_t;
+
 static ecr_option_t ecr_sys_cmd_options[] = {
 //
         { "heartbeat", 0, NULL, 'b' }, //
         { "shutdown", 0, NULL, 'd' }, //
+        { "stat", 1, NULL, 's' }, //
         { "help", 0, NULL, 'h' }, //
         { 0, 0, 0, 0 } }; //
 
+static void ecr_app_user_stat_free(ecr_app_user_stat_t *user_stat) {
+    ecr_hashmap_destroy(&user_stat->data, NULL);
+    free(user_stat);
+}
+
 static void ecr_sys_cmd_handler(ecr_cmd_ctx_t *ctx, int argc, char **argv, FILE *stream) {
-    char opt;
+    char opt, *id, *key;
+    size_t key_size;
+    uint64_t value, last_value, time_diff;
+    ecr_app_t *app = ctx->user;
+    ecr_app_user_stat_t *user_stat, *last_stat;
+    ecr_hashmap_iter_t iter;
 
     ecr_getopt_data_t getopt_data = ECR_GETOPT_DATA_INITIALIZER;
     while ((opt = ecr_getopt_long(argc, argv, "", ecr_sys_cmd_options, NULL, &getopt_data)) != EOF) {
@@ -40,6 +56,28 @@ static void ecr_sys_cmd_handler(ecr_cmd_ctx_t *ctx, int argc, char **argv, FILE 
             break;
         case 'h':
             fprintf(stream, "not implemented.");
+            break;
+        case 's':
+            id = getopt_data.optarg;
+            user_stat = calloc(1, sizeof(ecr_app_user_stat_t));
+            ecr_hashmap_init(&user_stat->data, 16, 0);
+            ecr_counter_get_all(&app->counter_ctx, &user_stat->data);
+            user_stat->timestamp = ecr_current_time();
+            fprintf(stream, "startup_time:\t%s\n", app->startup_time_str);
+            fprintf(stream, "timestamp:\t%lu\n", user_stat->timestamp);
+            last_stat = ecr_hashmap_put(&app->user_stats, id, strlen(id) + 1, user_stat);
+            if (last_stat) {
+                ecr_hashmap_iter_init(&iter, &user_stat->data);
+                time_diff = (user_stat->timestamp - last_stat->timestamp) / 1000;
+                if (!time_diff) {
+                    time_diff = 1;
+                }
+                while (ecr_hashmap_iter_next(&iter, (void**) &key, &key_size, (void**) &value) == 0) {
+                    last_value = ecr_hashmap_get(&last_stat->data, key, key_size) - NULL;
+                    fprintf(stream, "%s\t%lu\t%lu\t%lu\n", key, value, last_value, (value - last_value) / time_diff);
+                }
+                ecr_app_user_stat_free(last_stat);
+            }
             break;
         default:
             fprintf(stream, "unknow command\n");
@@ -167,6 +205,7 @@ int ecr_app_init(ecr_app_t *app, int argc, char **argv) {
     }
 
     ecr_counter_ctx_init(&app->counter_ctx);
+    ecr_hashmap_init(&app->user_stats, 16, 0);
 
     // init cmd
     ecr_set_thread_name("zmq");
@@ -174,6 +213,7 @@ int ecr_app_init(ecr_app_t *app, int argc, char **argv) {
     zmq_ctx_set(app->zmq_ctx, ZMQ_IO_THREADS, app->config.zmq_io_thread_count);
     if (app->config.cmd_zmq_bind) {
         if (ecr_cmd_ctx_init(&app->cmd_ctx, app->zmq_ctx, app->config.cmd_zmq_bind) == 0) {
+            app->cmd_ctx.user = app;
             ecr_cmd_register(&app->cmd_ctx, "sys", ecr_sys_cmd_handler, "system control commands.");
         } else {
             ecr_set_thread_name(thread_name);
@@ -252,6 +292,11 @@ int ecr_app_destroy_next(ecr_app_module_stack_t *stack) {
     return stack->module->destroy_handler(stack);
 }
 
+static void ecr_app_user_stat_destroy_handler(ecr_hashmap_t *map, void *key, size_t key_size, void *value) {
+    ecr_app_user_stat_t *user_stat = value;
+    ecr_app_user_stat_free(user_stat);
+}
+
 int ecr_app_startup(ecr_app_t *app, ecr_list_t *modules) {
     char * stat_string;
     size_t size;
@@ -308,6 +353,7 @@ int ecr_app_startup(ecr_app_t *app, ecr_list_t *modules) {
         ecr_cmd_ctx_destroy(&app->cmd_ctx);
         ecr_config_destroy(&app->config_props);
         ecr_counter_ctx_destroy(&app->counter_ctx);
+        ecr_hashmap_destroy(&app->user_stats, ecr_app_user_stat_destroy_handler);
 
         if (app->stat_log_file != NULL) {
             ecr_logger_close(app->stat_log_file);

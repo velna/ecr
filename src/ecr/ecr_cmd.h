@@ -19,6 +19,7 @@ typedef struct {
     pthread_mutex_t zmq_mutex;
     char alive;
     pthread_t cmd_thread;
+    void *user;
 } ecr_cmd_ctx_t;
 
 typedef void (*ecr_cmd_handler)(ecr_cmd_ctx_t *ctx, int argc, char **argv, FILE *stream);

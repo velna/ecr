@@ -70,6 +70,8 @@ int ecr_counter_print(ecr_counter_ctx_t *ctx, FILE *stream);
 
 int ecr_counter_print_all(ecr_counter_ctx_t *ctx, FILE *stream);
 
+void ecr_counter_get_all(ecr_counter_ctx_t *ctx, ecr_hashmap_t *map);
+
 void ecr_counter_ctx_destroy(ecr_counter_ctx_t *ctx);
 
 #endif /* ECR_COUNTER_H_ */

@@ -193,7 +193,7 @@ void ecr_cmd_unregister(ecr_cmd_ctx_t *ctx, char *s_cmd) {
     }
 }
 
-int ecr_cmd_ctx_init(ecr_cmd_ctx_t *ctx, void * zmq_ctx, const char* cmd_zmq_bind) {
+int ecr_cmd_ctx_init(ecr_cmd_ctx_t *ctx, void *zmq_ctx, const char *cmd_zmq_bind) {
     int rc;
     int zmq_opt;
     memset(ctx, 0, sizeof(ecr_cmd_ctx_t));

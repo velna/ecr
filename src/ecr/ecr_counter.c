@@ -205,6 +205,17 @@ int ecr_counter_print(ecr_counter_ctx_t *ctx, FILE *stream) {
     return rc;
 }
 
+void ecr_counter_get_all(ecr_counter_ctx_t *ctx, ecr_hashmap_t *map) {
+    int i;
+    ecr_counter_t *ctr;
+
+    for (i = 0; i < ecr_list_size(&ctx->counters); i++) {
+        if ((ctr = ecr_list_get(&ctx->counters, i)) != NULL) {
+            ecr_hashmap_put(map, ctr->name, strlen(ctr->name) + 1, NULL + ctr->value);
+        }
+    }
+}
+
 static void ecr_destroy_handler(ecr_list_t *l, int i, void *value) {
     ecr_counter_destroy(value);
 }

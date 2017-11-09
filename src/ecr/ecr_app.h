@@ -13,6 +13,7 @@
 #include "ecr_rollingfile.h"
 #include "ecr_cmd.h"
 #include "ecr_list.h"
+#include "ecr_hashmap.h"
 #include "ecr_counter.h"
 #include <signal.h>
 #include <mongoc.h>
@@ -51,6 +52,7 @@ typedef struct {
     char **argv;
     ecr_cmd_ctx_t cmd_ctx;
     ecr_counter_ctx_t counter_ctx;
+    ecr_hashmap_t user_stats;
     sigset_t sigset;
     mongoc_client_pool_t *mongo_pool;
     rd_kafka_t *kafka;
