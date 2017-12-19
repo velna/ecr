@@ -131,4 +131,4 @@ libecr_la_LDFLAGS = -version-info @ECR_VERSION@
 # Compiler options. Here we are adding the include directory
 # to be searched for headers included in the source code.
 
-libecr_la_CFLAGS = -Wall $(shell pkg-config --cflags libmongoc-1.0 zlib) -I$(top_srcdir)/src/ecr
+libecr_la_CFLAGS = -Wall $(shell pkg-config --cflags libmongoc-1.0 zlib) -I$(top_srcdir)/src/ecr -I${EXTRA_PACKAGE_INCLUDE_DIR}

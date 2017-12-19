@@ -12,6 +12,7 @@ AC_SUBST(ECR_VERSION)
 # Checks for programs.
 AC_PROG_CC
 AC_PROG_LIBTOOL
+PKG_PROG_PKG_CONFIG
 
 AM_INIT_AUTOMAKE([foreign subdir-objects])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -31,6 +32,16 @@ if test $pfring != no; then
         AC_DEFINE([ENABLE_PFRING], [], [enable pfring])
 fi
 
+AC_ARG_WITH([extra-package-dir],
+            [AS_HELP_STRING([--with-extra-package-dir],
+              [extra package dir, defaults to /usr/local])],
+            [with_extrapackagedir=$withval],
+            [with_extrapackagedir=/usr/local])
+AS_IF([test "x$with_extrapackagedir" != xno],
+	[AC_SUBST([EXTRA_PACKAGE_DIR], [$with_extrapackagedir])
+	 AC_SUBST([EXTRA_PACKAGE_LIB_DIR], [$with_extrapackagedir/lib])
+	 AC_SUBST([EXTRA_PACKAGE_INCLUDE_DIR], [$with_extrapackagedir/include])
+	])
 
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h stdint.h stdlib.h string.h sys/socket.h unistd.h netinet/in.h sys/time.h])
@@ -59,5 +70,6 @@ echo "
 configure results:
 ------------------------
 enable_pfring:          $pfring
+extra_package_dir:      $with_extrapackagedir
 ========================
 "
