@@ -16,6 +16,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <pthread.h>
+#include <net/ethernet.h>
 
 void ecr_test_rollingfile() {
     static ecr_io_reg_t ecr_io_regs[] = {
@@ -409,6 +410,6 @@ void test_urlmatch(int argc, char ** argv) {
 
 int main(int argc, char **argv) {
 //    test_urlmatch(argc, argv);
-    test_bwlist(argv[1], argv[2]);
+    printf("%zd\n", sizeof(struct ether_addr));
     return EXIT_SUCCESS;
 }

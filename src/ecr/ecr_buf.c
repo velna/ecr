@@ -182,7 +182,7 @@ size_t ecr_buf_copy(ecr_buf_t *buf, void *to, size_t size) {
     if (buf->position + size > buf->limit) {
         return 0;
     }
-    memcpy(to, buf->p, size);
+    memcpy(to, buf->p + buf->position, size);
     buf->position += size;
     return size;
 }
