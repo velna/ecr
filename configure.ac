@@ -36,7 +36,7 @@ AC_ARG_WITH([extra-package-dir],
             [AS_HELP_STRING([--with-extra-package-dir],
               [extra package dir, defaults to /usr/local])],
             [with_extrapackagedir=$withval],
-            [with_extrapackagedir=/usr/local])
+            [with_extrapackagedir=/usr/local/extra-packages])
 AS_IF([test "x$with_extrapackagedir" != xno],
 	[AC_SUBST([EXTRA_PACKAGE_DIR], [$with_extrapackagedir])
 	 AC_SUBST([EXTRA_PACKAGE_LIB_DIR], [$with_extrapackagedir/lib])
