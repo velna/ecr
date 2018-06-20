@@ -10,7 +10,6 @@
 #include "ecr_logger.h"
 #include "ecr_util.h"
 #include "ecr_getopt.h"
-#include "ecr_kafka.h"
 #include <unistd.h>
 #include <assert.h>
 #include <string.h>
@@ -241,16 +240,6 @@ int ecr_app_init(ecr_app_t *app, int argc, char **argv) {
         L_INFO("mongo connected at %s", app->config.mongo_uri);
     }
 
-    // init kafka
-    if (app->config.kafka_brokers) {
-        app->kafka = ecr_kafka_new_producer(app->config.kafka_brokers, "app.kafka", &app->config_props);
-        if (!app->kafka) {
-            L_ERROR("error init kafka.");
-            return -1;
-        }
-        L_INFO("kafka brokers connected at %s", app->config.kafka_brokers);
-    }
-
     return 0;
 }
 
@@ -366,12 +355,6 @@ int ecr_app_startup(ecr_app_t *app, ecr_list_t *modules) {
             mongoc_cleanup();
             app->mongo_pool = NULL;
             L_INFO("mongo pool destroied.");
-        }
-
-        if (app->kafka) {
-            rd_kafka_destroy(app->kafka);
-            rd_kafka_wait_destroyed(1000);
-            app->kafka = NULL;
         }
 
         L_INFO("goodbye.");

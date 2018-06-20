@@ -13,7 +13,6 @@
 #include "ecr_fixedhashmap.h"
 #include "ecr_wumanber.h"
 #include "ecr_list.h"
-#include "ecr_skiplist.h"
 #include <stdio.h>
 #include <mongoc.h>
 

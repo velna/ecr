@@ -17,7 +17,6 @@
 #include "ecr_counter.h"
 #include <signal.h>
 #include <mongoc.h>
-#include <librdkafka/rdkafka.h>
 
 typedef struct ecr_app_module_s ecr_app_module_t;
 
@@ -55,7 +54,6 @@ typedef struct {
     ecr_hashmap_t user_stats;
     sigset_t sigset;
     mongoc_client_pool_t *mongo_pool;
-    rd_kafka_t *kafka;
 } ecr_app_t;
 
 typedef struct {

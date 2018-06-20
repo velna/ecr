@@ -23,15 +23,6 @@ AC_DEFINE([MONGO_HAVE_UNISTD], [], [mongo have unistd])
 
 # Checks for libraries.
 
-AC_ARG_ENABLE([pfring],
-    [AS_HELP_STRING([--enable-pfring], [enable pfring, default disable])],
-    [pfring=$enableval],
-    [pfring=no])
-AM_CONDITIONAL([ENABLE_PFRING], [test x$pfring != xno])
-if test $pfring != no; then
-        AC_DEFINE([ENABLE_PFRING], [], [enable pfring])
-fi
-
 AC_ARG_WITH([extra-package-dir],
             [AS_HELP_STRING([--with-extra-package-dir],
               [extra package dir, defaults to /usr/local])],
@@ -61,15 +52,13 @@ AC_CHECK_FUNCS([gettimeofday memmove memset strchr strdup strerror])
 
 AC_CONFIG_FILES([Makefile
                  src/Makefile
-                 src/xcmd/Makefile
-                 test/Makefile])
+                 src/xcmd/Makefile])
 AC_OUTPUT
 
 echo "
 ========================
 configure results:
 ------------------------
-enable_pfring:          $pfring
 extra_package_dir:      $with_extrapackagedir
 ========================
 "

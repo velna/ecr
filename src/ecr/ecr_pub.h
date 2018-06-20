@@ -10,16 +10,14 @@
 
 #include "ecrconf.h"
 #include "ecr_config.h"
-#include "ecr_io.h"
 #include "ecr_counter.h"
 #include <pcap.h>
 #include <pthread.h>
-#include <librdkafka/rdkafka.h>
 
 #define ECR_PUB_CODEC_NONE  -1
 
 typedef enum {
-    ECR_PUB_STAT, ECR_PUB_ZMQ, ECR_PUB_FILE, ECR_PUB_KAFKA, ECR_PUB_PACKET
+    ECR_PUB_STAT, ECR_PUB_ZMQ, ECR_PUB_PACKET
 } ecr_pub_type_t;
 
 typedef struct {
@@ -29,14 +27,6 @@ typedef struct {
             const char *endpoint;
             const char *options;
         } zmq;
-        struct {
-            const char *name;
-            int split;
-        } file;
-        struct {
-            const char *brokers;
-            const char *topic;
-        } kafka;
         struct {
             const char *device;
         } packet;
@@ -60,16 +50,6 @@ typedef struct ecr_pub_output_s {
             pthread_mutex_t lock;
         } zmq;
         struct {
-            FILE **array;
-            int split;
-            int *idx_array;
-        } file;
-        struct {
-            int new;
-            rd_kafka_t *kafka;
-            rd_kafka_topic_t *topic;
-        } kafka;
-        struct {
             pcap_t *pcap;
         } packet;
     };
@@ -91,8 +71,6 @@ typedef struct {
     int num_threads;
     ecr_counter_ctx_t *cctx;
     void *zmq_ctx;
-    rd_kafka_t *kafka;
-    ecr_io_reg_t *io_regs;
     ecr_pub_codec_t *codecs;
     ecr_pub_write_cb write_cb;
     ecr_pub_output_cb output_init_cb;

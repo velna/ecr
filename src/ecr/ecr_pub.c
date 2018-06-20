@@ -9,7 +9,6 @@
 #include "ecr_pub.h"
 #include "ecr_util.h"
 #include "ecr_logger.h"
-#include "ecr_kafka.h"
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -36,42 +35,20 @@ int ecr_pub_init(ecr_pub_t *pub, const char *id, ecr_pub_config_t *config) {
 int ecr_pub_output_config(ecr_pub_t *pub, ecr_config_t *config) {
     int ok = 0, error = 0;
     ecr_pub_output_config_t stat_config = { .type = ECR_PUB_STAT };
-    ecr_pub_output_config_t file_config = { .type = ECR_PUB_FILE };
     ecr_pub_output_config_t zmq_config = { .type = ECR_PUB_ZMQ };
-    ecr_pub_output_config_t kafka_config = { .type = ECR_PUB_KAFKA };
     ecr_pub_output_config_t packet_config = { .type = ECR_PUB_PACKET };
     ecr_config_line_t config_lines[] = {
     //
-            { "file_format", &file_config.format, ECR_CFG_STRING }, //
-            { "file_name", &file_config.file.name, ECR_CFG_STRING }, //
-            { "file_split", &file_config.file.split, ECR_CFG_INT }, //
             { "zmq_format", &zmq_config.format, ECR_CFG_STRING }, //
             { "zmq_endpoint", &zmq_config.zmq.endpoint, ECR_CFG_STRING }, //
             { "zmq_options", &zmq_config.zmq.options, ECR_CFG_STRING }, //
-            { "kafka_format", &kafka_config.format, ECR_CFG_STRING }, //
-            { "kafka_brokers", &kafka_config.kafka.brokers, ECR_CFG_STRING }, //
-            { "kafka_topic", &kafka_config.kafka.topic, ECR_CFG_STRING }, //
             { "packet_format", &packet_config.format, ECR_CFG_STRING }, //
             { "packet_device", &packet_config.packet.device, ECR_CFG_STRING }, //
             { 0 } };
 
     ecr_config_load(config, pub->id, config_lines);
-    if (file_config.format && file_config.file.name) {
-        if (ecr_pub_output_add(pub, &file_config, config)) {
-            error++;
-        } else {
-            ok++;
-        }
-    }
     if (zmq_config.format && zmq_config.zmq.endpoint) {
         if (ecr_pub_output_add(pub, &zmq_config, config)) {
-            error++;
-        } else {
-            ok++;
-        }
-    }
-    if (kafka_config.format && kafka_config.kafka.topic) {
-        if (ecr_pub_output_add(pub, &kafka_config, config)) {
             error++;
         } else {
             ok++;
@@ -94,9 +71,7 @@ int ecr_pub_output_config(ecr_pub_t *pub, ecr_config_t *config) {
 
 int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *output_config, ecr_config_t *config) {
     ecr_pub_output_t *output = calloc(1, sizeof(ecr_pub_output_t));
-    int i, j;
-    char *fp, *s, errstr[512], *id;
-    FILE *file;
+    int i;
     char errbuf[PCAP_ERRBUF_SIZE];
 
     switch (output_config->type) {
@@ -125,84 +100,6 @@ int ecr_pub_output_add(ecr_pub_t *pub, ecr_pub_output_config_t *output_config, e
         output->bytes_ok = ecr_counter_create(pub->config.cctx, pub->id, "zmq_bytes_ok", 0);
         output->bytes_error = ecr_counter_create(pub->config.cctx, pub->id, "zmq_bytes_error", 0);
         L_INFO("%s: add zmq output: %s[%s].", pub->id, output_config->zmq.endpoint, output_config->zmq.options);
-        break;
-    case ECR_PUB_FILE:
-        output->file.split = output_config->file.split <= 0 ? 1 : output_config->file.split;
-        output->file.idx_array = calloc(pub->config.num_threads, sizeof(int));
-        output->file.array = calloc(pub->config.num_threads * output->file.split, sizeof(FILE *));
-        for (i = 0; i < pub->config.num_threads; i++) {
-            for (j = 0; j < output->file.split; j++) {
-                fp = strdup(output_config->file.name);
-                s = fp;
-                while (*s) {
-                    if (*s == '#') {
-                        *s = '0' + j;
-                    }
-                    s++;
-                }
-                file = output->file.array[i * output->file.split + j] = ecr_rollingfile_open(fp, i,
-                        pub->config.io_regs);
-                free(fp);
-                if (!file) {
-                    L_ERROR("%s: error init rolling file %s", pub->id, output_config->file.name);
-                    for (i = 0; i < pub->config.num_threads; i++) {
-                        for (j = 0; j < output->file.split; j++) {
-                            if ((file = output->file.array[i * output->file.split + j])) {
-                                fclose(file);
-                            }
-                        }
-                    }
-                    free(output->file.array);
-                    free(output);
-                    return -1;
-                }
-            }
-        }
-        output->ok = ecr_counter_create(pub->config.cctx, pub->id, "file_ok", 0);
-        output->error = ecr_counter_create(pub->config.cctx, pub->id, "file_error", 0);
-        output->bytes_ok = ecr_counter_create(pub->config.cctx, pub->id, "file_bytes_ok", 0);
-        output->bytes_error = ecr_counter_create(pub->config.cctx, pub->id, "file_bytes_error", 0);
-        L_INFO("%s: add file output: %s[%d].", pub->id, output_config->file.name, output_config->file.split);
-        break;
-    case ECR_PUB_KAFKA:
-        asprintf(&id, "%s.kafka", pub->id);
-        if (output_config->kafka.brokers) {
-            output->kafka.new = 1;
-            output->kafka.kafka = ecr_kafka_new_producer(output_config->kafka.brokers, id, config);
-            if (!output->kafka.kafka) {
-                L_ERROR("%s: error init kafka file %s@%s, %s", pub->id, output_config->kafka.topic,
-                        output_config->kafka.brokers, errstr);
-                free(output);
-                free(id);
-                return -1;
-            }
-        } else {
-            output->kafka.kafka = pub->config.kafka;
-            if (!output->kafka.kafka) {
-                L_ERROR(
-                        "%s: error init kafka file %s@%s, no broker configured and no system default kafka is configured.",
-                        pub->id, output_config->kafka.topic, output_config->kafka.brokers);
-                free(output);
-                free(id);
-                return -1;
-            }
-        }
-
-        output->kafka.topic = ecr_kafka_new_topic(output->kafka.kafka, id, output_config->kafka.topic, config);
-        if (!output->kafka.topic) {
-            L_ERROR("%s: error init kafka file %s@%s, Failed to create new topic: %s", pub->id,
-                    output_config->kafka.topic, output_config->kafka.brokers,
-                    rd_kafka_err2str(rd_kafka_errno2err(errno)));
-            free(output);
-            free(id);
-            return -1;
-        }
-        output->ok = ecr_counter_create(pub->config.cctx, pub->id, "kafka_ok", 0);
-        output->error = ecr_counter_create(pub->config.cctx, pub->id, "kafka_error", 0);
-        output->bytes_ok = ecr_counter_create(pub->config.cctx, pub->id, "kafka_bytes_ok", 0);
-        output->bytes_error = ecr_counter_create(pub->config.cctx, pub->id, "kafka_bytes_error", 0);
-        L_INFO("%s: add kafka output: %s@%s.", pub->id, output_config->kafka.topic, output_config->kafka.brokers);
-        free(id);
         break;
     case ECR_PUB_PACKET:
         output->packet.pcap = pcap_create(output_config->packet.device, errbuf);
@@ -279,22 +176,6 @@ void ecr_pub_key(ecr_pub_t *pub, void *data, void *key, size_t key_len, int tid)
                     }
                     pthread_mutex_unlock(&output->zmq.lock);
                     break;
-                case ECR_PUB_FILE:
-                    if (fwrite(buf->ptr, buf->len, 1,
-                            output->file.array[tid * output->file.split + output->file.idx_array[tid]]) != 1) {
-                        ok = 0;
-                    }
-                    if (++output->file.idx_array[tid] == output->file.split) {
-                        output->file.idx_array[tid] = 0;
-                    }
-                    break;
-                case ECR_PUB_KAFKA:
-                    if (rd_kafka_produce(output->kafka.topic, RD_KAFKA_PARTITION_UA, RD_KAFKA_MSG_F_COPY, buf->ptr,
-                            buf->len, key, key_len, (NULL))) {
-                        ok = 0;
-                    }
-                    rd_kafka_poll(output->kafka.kafka, 0);
-                    break;
                 case ECR_PUB_PACKET:
                     if (pcap_sendpacket(output->packet.pcap, (u_char*) buf->ptr, (int) buf->len)) {
                         ok = 0;
@@ -313,8 +194,7 @@ void ecr_pub_key(ecr_pub_t *pub, void *data, void *key, size_t key_len, int tid)
 
 void ecr_pub_destroy(ecr_pub_t *pub) {
     ecr_pub_output_t *output = pub->outputs, *next;
-    int i, j;
-    FILE *file;
+    int i;
 
     if (!pub->id) {
         return;
@@ -334,29 +214,6 @@ void ecr_pub_destroy(ecr_pub_t *pub) {
             pthread_mutex_destroy(&output->zmq.lock);
             ecr_counter_delete(pub->config.cctx, pub->id, "zmq_ok");
             ecr_counter_delete(pub->config.cctx, pub->id, "zmq_bytes");
-            break;
-        case ECR_PUB_FILE:
-            for (i = 0; i < pub->config.num_threads; i++) {
-                for (j = 0; j < output->file.split; j++) {
-                    if ((file = output->file.array[i * output->file.split + j])) {
-                        fclose(file);
-                    }
-                }
-            }
-            free(output->file.array);
-            free(output->file.idx_array);
-            ecr_counter_delete(pub->config.cctx, pub->id, "file_ok");
-            ecr_counter_delete(pub->config.cctx, pub->id, "file_bytes");
-            break;
-        case ECR_PUB_KAFKA:
-            rd_kafka_poll(output->kafka.kafka, 0);
-            rd_kafka_topic_destroy(output->kafka.topic);
-            if (output->kafka.new) {
-                rd_kafka_destroy(output->kafka.kafka);
-                rd_kafka_wait_destroyed(1000);
-            }
-            ecr_counter_delete(pub->config.cctx, pub->id, "kafka_ok");
-            ecr_counter_delete(pub->config.cctx, pub->id, "kafka_bytes");
             break;
         case ECR_PUB_PACKET:
             if (output->packet.pcap) {

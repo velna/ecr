@@ -9,7 +9,6 @@
 #define ECR_WUMANBER_H_
 
 #include "ecrconf.h"
-#include "ecr_heap.h"
 #include "ecr_list.h"
 #include "ecr_hashmap.h"
 
