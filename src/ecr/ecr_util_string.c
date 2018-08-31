@@ -243,3 +243,39 @@ int ecr_str_cast(const char *str, ecr_type_t type, void *out) {
     }
     return 0;
 }
+
+int ecr_str_contains_mobile(ecr_str_t * str) {
+    static uint8_t mobile_pre[256];
+    mobile_pre['3'] = 1;
+    mobile_pre['4'] = 1;
+    mobile_pre['5'] = 1;
+    mobile_pre['7'] = 1;
+    mobile_pre['8'] = 1;
+    mobile_pre['9'] = 1;
+    if (str->len < 11 || !str->ptr) {
+        return -1;
+    }
+
+    char * p, *s = str->ptr, *s0 = s, *pe = str->ptr + str->len;
+    while ((p = strchr(s, '1')) && (pe - p) >= 11) {
+        int i, n = -1;
+        for (i = 10; i > 0; i--) {
+            if (!isdigit(p[i])) {
+                n = i;
+                break;
+            }
+        }
+        if (n == -1) {
+            if ((p == s0
+                    || (!isdigit(*(p - 1))
+                            || (*(p - 1) == '6' && p - s0 > 1 && *(p - 2) == '8' && (p - s0 == 2 || !isdigit(*(p - 3))))))
+                    && (pe - p == 11 || !isdigit(p[11])) && (mobile_pre[(int) p[1]])) {
+                return p - s0;
+            }
+            n = 2;
+        }
+        s = p + n + 1;
+    }
+    return -1;
+
+}
